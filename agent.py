@@ -98,6 +98,11 @@ class Agent:
         self.rewards.append(reward)
         self.actions.append(self.last_action)
         self.values.append(self.last_value)
+        if len(self.states) > 30:
+            self.states.pop(0)
+            self.rewards.pop(0)
+            self.actions.pop(0)
+            self.values.pop(0)
         self.train(0)
         self.stop_episode()
 
