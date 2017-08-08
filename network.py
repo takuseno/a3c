@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 
@@ -42,7 +43,7 @@ def _make_network(convs, inpt, num_actions, scope, reuse=None):
 
         policy = layers.fully_connected(rnn_out,
                 num_actions, activation_fn=tf.nn.softmax,
-                weights_initlaizer=normalized_columns_initializer(0.01))
+                weights_initializer=normalized_columns_initializer(0.01))
 
         value = layers.fully_connected(rnn_out, 1, activation_fn=None,
                 weights_initializer=normalized_columns_initializer(1.0))

@@ -65,10 +65,10 @@ class Agent:
             self.values = []
             self.update_local()
 
-        if self.last_obs is not None
+        if self.last_obs is not None:
             self.states.append(self.last_obs)
             self.rewards.append(reward)
-            self.actions.append(self.action)
+            self.actions.append(self.last_action)
             self.values.append(self.last_value)
 
         self.t += 1
