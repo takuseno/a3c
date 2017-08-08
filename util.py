@@ -62,6 +62,7 @@ class _Function(object):
                 kwargs_passed_inpt_names.add(inpt_name)
                 feed_dict[inpt] = kwargs.pop(inpt_name)
         for inpt in self.givens:
-            feed_dict[inpt] = feed_dict.get(inpt, self.givens[inpt])
+            if inpt not in feed_dict or feed_dict[inpt] is None:
+                feed_dict[inpt] = self.givens[inpt]
         results = get_session().run(self.outputs_update, feed_dict=feed_dict)[:-1]
         return results

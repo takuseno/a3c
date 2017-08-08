@@ -3,8 +3,10 @@ import numpy as np
 import tensorflow as tf
 
 class Agent:
-    def __init__(self, model, num_actions, exploration, name='global', lr=2.5e-4):
-        self.exoploration = exploration
+    def __init__(self, model, num_actions, exploration, name='global', lr=2.5e-4, gamma=0.99):
+        self.num_actions = num_actions
+        self.exploration = exploration
+        self.gamma = gamma
         self.t = 0
 
         act, train, update_local, action_dist, state_value = build_graph.build_train(
@@ -20,6 +22,7 @@ class Agent:
         self._action_dist = action_dist
         self._state_value = state_value
 
+        self.rnn_state = None
         self.last_obs = None
         self.last_reward = None
         self.last_action = None
@@ -36,34 +39,45 @@ class Agent:
         for i in reversed(range(length)):
             value = rewards[i] + gamma * returns[length - 1 - i]
             returns.append(value)
-        return reversed(returns)
+        return np.array(list(reversed(returns)), dtype=np.float32).flatten()
 
     def train(self, bootstrap_value):
-        states = np.array(self.states, dtype=np.float32) / 255.0
+        states = np.zeros((30, 4, 84, 84), dtype=np.float32)
+        states[:len(self.states)] = np.array(self.states, dtype=np.float32) / 255.0
+        actions = np.zeros((30), dtype=np.float32)
+        actions[:len(self.actions)] = np.array(self.actions)
         rewards = np.array(self.rewards)
-        actions = np.array(self.actions)
-        values = np.array(self.values + [bootstrap_value], dtype=np.float32)
+        values = np.array(self.values + [bootstrap_value], dtype=np.float32).flatten()
 
-        target_values = self.compute_returns(rewards, gamma, bootstrap_value)
+        target_values = self.compute_returns(rewards, self.gamma, bootstrap_value)[:len(rewards)]
         advantages = 0.99 * values[1:] + rewards - values[:-1]
-        loss = self._train(states, actions, target_values, advantages)
+
+        tmp_target_values = np.zeros((30), dtype=np.float32)
+        tmp_target_values[:len(target_values)] = target_values
+        target_values = tmp_target_values
+
+        tmp_advantages = np.zeros((30), dtype=np.float32)
+        tmp_advantages[:len(advantages)] = advantages
+        advantages = tmp_advantages
+
+        loss = self._train(states, None, actions, target_values, advantages)
         return loss
 
     def act_and_train(self, obs, reward):
-        update_eps = self.exploration.value(self.t)
         normalized_obs = np.zeros((30, 4, 84, 84), dtype=np.float32)
-        normalized_obs[0] = np.array(obs, dtype=np.float32)/ 255.0
-        action = self._act(normalized_obs, update_eps=update_eps)[0]
-        value = self._state_value(normalized_obs)[0]
+        normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
+        prob, rnn_state = self._act(normalized_obs, self.rnn_state)
+        action = np.choose(self.num_actions, p=prob)
+        value = self._state_value(normalized_obs, self.rnn_state)[0]
 
-        if len(states) == 30:
-            bootstrap_value = self._state_value(normalized_obs)
+        if len(self.states) == 30:
+            bootstrap_value = self._state_value(normalized_obs)[0]
             self.train(bootstrap_value)
             self.states = []
             self.rewards = []
             self.actions = []
             self.values = []
-            self.update_local()
+            self._update_local()
 
         if self.last_obs is not None:
             self.states.append(self.last_obs)
@@ -72,6 +86,7 @@ class Agent:
             self.values.append(self.last_value)
 
         self.t += 1
+        self.rnn_state = np.array(rnn_state, dtype=np.float32)
         self.last_obs = obs
         self.last_reward = reward
         self.last_action = action
@@ -79,14 +94,15 @@ class Agent:
         return action
 
     def stop_episode_and_train(self, obs, reward, done=False):
-        sefl.states.append(self.last_obs)
-        self.rewards.append(self.reward)
+        self.states.append(self.last_obs)
+        self.rewards.append(reward)
         self.actions.append(self.last_action)
         self.values.append(self.last_value)
         self.train(0)
         self.stop_episode()
 
     def stop_episode(self):
+        self.rnn_state = None
         self.last_obs = None
         self.last_reward = None
         self.last_action = None
