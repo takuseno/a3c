@@ -67,7 +67,7 @@ class Agent:
         normalized_obs = np.zeros((30, 4, 84, 84), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
         prob, rnn_state = self._act(normalized_obs, self.rnn_state)
-        action = np.choose(self.num_actions, p=prob)
+        action = np.random.choice(range(self.num_actions), p=prob[0])
         value = self._state_value(normalized_obs, self.rnn_state)[0]
 
         if len(self.states) == 30:
