@@ -33,7 +33,7 @@ class Agent:
         self.actions = []
         self.values = []
 
-    def compute_returns(self, rewards, gamma, bootstrap_value):
+    def discount(self, rewards, gamma, bootstrap_value):
         returns = [bootstrap_value]
         length = len(rewards)
         for i in reversed(range(length)):
@@ -42,29 +42,20 @@ class Agent:
         return np.array(list(reversed(returns)), dtype=np.float32).flatten()
 
     def train(self, bootstrap_value):
-        states = np.zeros((30, 4, 84, 84), dtype=np.float32)
-        states[:len(self.states)] = np.array(self.states, dtype=np.float32) / 255.0
-        actions = np.zeros((30), dtype=np.float32)
-        actions[:len(self.actions)] = np.array(self.actions)
+        states = np.array(self.states, dtype=np.float32) / 255.0
+        actions = np.array(self.actions)
         rewards = np.array(self.rewards)
         values = np.array(self.values + [bootstrap_value], dtype=np.float32).flatten()
 
-        target_values = self.compute_returns(rewards, self.gamma, bootstrap_value)[:len(rewards)]
-        advantages = 0.99 * values[1:] + rewards - values[:-1]
-
-        tmp_target_values = np.zeros((30), dtype=np.float32)
-        tmp_target_values[:len(target_values)] = target_values
-        target_values = tmp_target_values
-
-        tmp_advantages = np.zeros((30), dtype=np.float32)
-        tmp_advantages[:len(advantages)] = advantages
-        advantages = tmp_advantages
+        target_values = self.discount(rewards, self.gamma, bootstrap_value)[:len(rewards)]
+        advantages = target_values - values[:-1]
 
         loss = self._train(states, None, actions, target_values, advantages)
+        print(np.mean(loss))
         return loss
 
     def act_and_train(self, obs, reward):
-        normalized_obs = np.zeros((30, 4, 84, 84), dtype=np.float32)
+        normalized_obs = np.zeros((1, 4, 84, 84), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
         prob, rnn_state = self._act(normalized_obs, self.rnn_state)
         action = np.random.choice(range(self.num_actions), p=prob[0])
@@ -98,11 +89,6 @@ class Agent:
         self.rewards.append(reward)
         self.actions.append(self.last_action)
         self.values.append(self.last_value)
-        if len(self.states) > 30:
-            self.states.pop(0)
-            self.rewards.pop(0)
-            self.actions.pop(0)
-            self.values.pop(0)
         self.train(0)
         self.stop_episode()
 

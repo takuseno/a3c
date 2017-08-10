@@ -14,15 +14,15 @@ def build_act(observations_ph, rnn_state_ph, model, num_actions, scope='a3c', re
         return act
 
 def build_train(model, num_actions, optimizer, scope='a3c', reuse=None):
-    obs_input = tf.placeholder(tf.float32, [30, 4, 84, 84], name='obs')
+    obs_input = tf.placeholder(tf.float32, [None, 4, 84, 84], name='obs')
     rnn_state_ph = tf.placeholder(tf.float32, [2, 1, 256])
 
     act_f = build_act(obs_input, rnn_state_ph, model, num_actions, scope=scope, reuse=reuse)
 
     with tf.variable_scope(scope, reuse=reuse):
-        actions_ph = tf.placeholder(tf.int32, [30], name='action')
-        target_values_ph = tf.placeholder(tf.float32, [30], name='value')
-        advantages_ph = tf.placeholder(tf.float32, [30], name='advantage')
+        actions_ph = tf.placeholder(tf.int32, [None], name='action')
+        target_values_ph = tf.placeholder(tf.float32, [None], name='value')
+        advantages_ph = tf.placeholder(tf.float32, [None], name='advantage')
         rnn_state_tuple = tf.contrib.rnn.LSTMStateTuple(rnn_state_ph[0], rnn_state_ph[1])
 
         policy, value, state_out = model(obs_input, rnn_state_tuple, num_actions, scope='model', reuse=True)
@@ -33,7 +33,7 @@ def build_train(model, num_actions, optimizer, scope='a3c', reuse=None):
         value_loss = 0.5 * tf.reduce_sum(tf.square(target_values_ph - tf.reshape(value, [-1])))
         entropy = -tf.reduce_sum(policy * tf.log(policy))
         policy_loss = -tf.reduce_sum(tf.log(responsible_outputs) * advantages_ph)
-        loss = 0.5 * value_loss + policy_loss - entropy * 0.01
+        loss = 0.5 * value_loss + policy_loss - entropy * 0.005
 
         local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
         gradients = tf.gradients(loss, local_vars)
