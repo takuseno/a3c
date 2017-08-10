@@ -3,9 +3,8 @@ import numpy as np
 import tensorflow as tf
 
 class Agent:
-    def __init__(self, model, num_actions, exploration, name='global', lr=2.5e-4, gamma=0.99):
+    def __init__(self, model, num_actions, name='global', lr=2.5e-4, gamma=0.99):
         self.num_actions = num_actions
-        self.exploration = exploration
         self.gamma = gamma
         self.t = 0
 
@@ -51,8 +50,15 @@ class Agent:
         advantages = target_values - values[:-1]
 
         loss = self._train(states, None, actions, target_values, advantages)
-        print(np.mean(loss))
         return loss
+
+    def act(self, obs):
+        normalized_obs = np.zeros((1, 4, 84, 84), dtype=np.float32)
+        normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
+        prob, rnn_state = self._act(normalized_obs, self.rnn_state)
+        action = np.argmax(prob)
+        self.rnn_state = rnn_state
+        return action
 
     def act_and_train(self, obs, reward):
         normalized_obs = np.zeros((1, 4, 84, 84), dtype=np.float32)

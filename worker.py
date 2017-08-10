@@ -9,16 +9,15 @@ from util import initialize, get_session
 from actions import get_action_space
 from network import make_network
 from agent import Agent
-from explorer import LinearDecayExplorer
 
 class Worker:
-    def __init__(self, name, model, global_step, env_name):
-        explorer = LinearDecayExplorer(final_exploration_step=100000)
-
+    def __init__(self, name, model, global_step, env_name, render=False, training=True):
+        self.training = training
         self.actions = get_action_space(env_name)
         self.env = gym.make(env_name)
         self.name = name
-        self.agent = Agent(model, len(self.actions), explorer, name=name)
+        self.render = render
+        self.agent = Agent(model, len(self.actions), name=name)
         self.global_step = global_step
         self.inc_global_step = global_step.assign_add(1)
 
@@ -45,9 +44,15 @@ class Worker:
                         self.agent.stop_episode_and_train(states, clipped_reward, done=done)
                         break
 
-                    action = self.actions[self.agent.act_and_train(states, clipped_reward)]
+                    if self.training:
+                        action_index = self.agent.act_and_train(states, clipped_reward)
+                    else:
+                        action_index = self.agent.act(states)
+                    action = self.actions[action_index]
 
                     state, reward, done, info = self.env.step(action)
+                    if self.render:
+                        self.env.render()
 
                     if reward > 0:
                         clipped_reward = 1

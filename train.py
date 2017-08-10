@@ -1,4 +1,5 @@
 import threading
+import multiprocessing
 import argparse
 import cv2
 import gym
@@ -12,25 +13,29 @@ from util import initialize, get_session
 from actions import get_action_space
 from network import make_network
 from agent import Agent
-from explorer import LinearDecayExplorer
 from worker import Worker
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--env', type=str, default='PongDeterministic-v4')
+    parser.add_argument('--render', action='store_true')
+    args = parser.parse_args()
+
     sess = tf.Session()
     sess.__enter__()
 
     model = make_network(
         [[32, 3, 2, 1], [32, 3, 2, 1], [32, 3, 2, 1], [32, 3, 2, 1]])
 
-    env_name = 'PongDeterministic-v4'
+    env_name = args.env
     actions = get_action_space(env_name)
-    master = Agent(model, len(actions), None, name='global')
+    master = Agent(model, len(actions), name='global')
 
     global_step = tf.Variable(0, dtype=tf.int64, name='global_step')
 
     workers = []
     for i in range(4):
-        worker = Worker('worker{}'.format(i), model, global_step, env_name)
+        worker = Worker('worker{}'.format(i), model, global_step, env_name, render=False)
         workers.append(worker)
 
     initialize()
