@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-import util
+import lightsaber.tensorflow.util as util
 
 
 def initial_state():

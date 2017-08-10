@@ -5,7 +5,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from util import initialize, get_session
+from lightsaber.tensorflow.util import get_session
 from actions import get_action_space
 from network import make_network
 from agent import Agent

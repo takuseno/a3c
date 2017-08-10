@@ -8,6 +8,7 @@ A3C imeplementation with TensorFlow.
 - tensorflow
 - opencv-python
 - numpy
+- git+https://github.com/imai-laboratory/lightsaber
 
 ## implementations
 This repostory is inspired by following projects.

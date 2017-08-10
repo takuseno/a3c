@@ -9,7 +9,7 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from util import initialize, get_session
+from lightsaber.tensorflow.util import initialize
 from actions import get_action_space
 from network import make_network
 from agent import Agent
