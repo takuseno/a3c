@@ -67,7 +67,7 @@ class Agent:
         action = np.random.choice(range(self.num_actions), p=prob[0])
         value = self._state_value(normalized_obs, self.rnn_state)[0]
 
-        if len(self.states) == 30:
+        if len(self.states) == 5:
             bootstrap_value = self._state_value(normalized_obs)[0]
             self.train(bootstrap_value)
             self.states = []
