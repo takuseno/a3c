@@ -26,7 +26,7 @@ class Worker:
             local_step = 0
 
             while True:
-                states = np.zeros((4, 84, 84), dtype=np.float32)
+                states = np.zeros((1, 84, 84), dtype=np.float32)
                 reward = 0
                 done = False
                 clipped_reward = 0

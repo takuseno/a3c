@@ -11,7 +11,7 @@ class Agent:
         act, train, update_local, action_dist, state_value = build_graph.build_train(
             model=model,
             num_actions=num_actions,
-            optimizer=tf.train.AdamOptimizer(learning_rate=1e-4),
+            optimizer=tf.train.RMSPropOptimizer(learning_rate=2.5e-4, decay=.99),
             scope=name
         )
 
@@ -44,16 +44,22 @@ class Agent:
         states = np.array(self.states, dtype=np.float32) / 255.0
         actions = np.array(self.actions)
         rewards = np.array(self.rewards)
-        values = np.array(self.values + [bootstrap_value], dtype=np.float32).flatten()
+        values = np.array(self.values, dtype=np.float32).flatten()
 
         target_values = self.discount(rewards, self.gamma, bootstrap_value)[:len(rewards)]
-        advantages = target_values - values[:-1]
+        advantages = target_values - values
+
+        target_values -= np.mean(target_values)
+        target_values /= np.std(target_values) + 1e-8
+
+        advantages -= np.mean(advantages)
+        advantages /= np.std(advantages) + 1e-8
 
         loss = self._train(states, None, actions, target_values, advantages)
         return loss
 
     def act(self, obs):
-        normalized_obs = np.zeros((1, 4, 84, 84), dtype=np.float32)
+        normalized_obs = np.zeros((1, 1, 84, 84), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
         prob, rnn_state = self._act(normalized_obs, self.rnn_state)
         action = np.argmax(prob)
@@ -61,15 +67,14 @@ class Agent:
         return action
 
     def act_and_train(self, obs, reward):
-        normalized_obs = np.zeros((1, 4, 84, 84), dtype=np.float32)
+        normalized_obs = np.zeros((1, 1, 84, 84), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
         prob, rnn_state = self._act(normalized_obs, self.rnn_state)
         action = np.random.choice(range(self.num_actions), p=prob[0])
         value = self._state_value(normalized_obs, self.rnn_state)[0]
 
         if len(self.states) == 5:
-            bootstrap_value = self._state_value(normalized_obs)[0]
-            self.train(bootstrap_value)
+            self.train(0)
             self.states = []
             self.rewards = []
             self.actions = []

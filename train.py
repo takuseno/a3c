@@ -19,6 +19,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='PongDeterministic-v4')
     parser.add_argument('--render', action='store_true')
+    parser.add_argument('--threads', type=int, default=8)
     args = parser.parse_args()
 
     sess = tf.Session()
@@ -34,20 +35,30 @@ def main():
     global_step = tf.Variable(0, dtype=tf.int64, name='global_step')
 
     workers = []
-    for i in range(4):
-        worker = Worker('worker{}'.format(i), model, global_step, env_name, render=False)
+    for i in range(args.threads):
+        render = False
+        if args.render and i == 0:
+            render = True
+        worker = Worker('worker{}'.format(i), model, global_step, env_name, render=render)
         workers.append(worker)
+
+    if args.render:
+        sample_worker = workers.pop(0)
 
     initialize()
 
     coord = tf.train.Coordinator()
     threads = []
-    for i in range(4):
+    for i in range(len(workers)):
         worker_thread = lambda: workers[i].run(sess)
         thread = threading.Thread(target=worker_thread)
         thread.start()
         threads.append(thread)
         time.sleep(0.1)
+
+    if args.render:
+        sample_worker.run(sess)
+
     coord.join(threads)
 
 if __name__ == '__main__':
