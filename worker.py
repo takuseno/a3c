@@ -21,7 +21,7 @@ class Worker:
         self.global_step = global_step
         self.inc_global_step = global_step.assign_add(1)
 
-    def run(self, sess):
+    def run(self, sess, summary_writer):
         with sess.as_default():
             local_step = 0
 
@@ -41,11 +41,11 @@ class Worker:
                     states[0] = state
 
                     if done:
-                        self.agent.stop_episode_and_train(states, clipped_reward, done=done)
+                        self.agent.stop_episode_and_train(states.reshape(84, 84, 1), clipped_reward, summary_writer, done=done)
                         break
 
                     if self.training:
-                        action_index = self.agent.act_and_train(states, clipped_reward)
+                        action_index = self.agent.act_and_train(states.reshape((84, 84, 1)), clipped_reward, summary_writer)
                     else:
                         action_index = self.agent.act(states)
                     action = self.actions[action_index]
@@ -55,11 +55,11 @@ class Worker:
                         self.env.render()
 
                     if reward > 0:
-                        clipped_reward = 1
+                        clipped_reward = 1.0
                     elif reward < 0:
-                        clipped_reward = -1
+                        clipped_reward = -1.0
                     else:
-                        clipped_reward = 0
+                        clipped_reward = 0.0
                     sum_of_rewards += reward
                     step += 1
                     local_step += 1 

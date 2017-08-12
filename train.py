@@ -26,7 +26,7 @@ def main():
     sess.__enter__()
 
     model = make_network(
-        [[32, 3, 2, 1], [32, 3, 2, 1], [32, 3, 2, 1], [32, 3, 2, 1]])
+        [[16, 8, 4, 0], [32, 4, 2, 0]])
 
     env_name = args.env
     actions = get_action_space(env_name)
@@ -42,6 +42,8 @@ def main():
         worker = Worker('worker{}'.format(i), model, global_step, env_name, render=render)
         workers.append(worker)
 
+    summary_writer = tf.summary.FileWriter('log', sess.graph)
+
     if args.render:
         sample_worker = workers.pop(0)
 
@@ -50,14 +52,14 @@ def main():
     coord = tf.train.Coordinator()
     threads = []
     for i in range(len(workers)):
-        worker_thread = lambda: workers[i].run(sess)
+        worker_thread = lambda: workers[i].run(sess, summary_writer)
         thread = threading.Thread(target=worker_thread)
         thread.start()
         threads.append(thread)
         time.sleep(0.1)
 
     if args.render:
-        sample_worker.run(sess)
+        sample_worker.run(sess, summary_writer)
 
     coord.join(threads)
 

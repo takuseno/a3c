@@ -2,16 +2,18 @@ import build_graph
 import numpy as np
 import tensorflow as tf
 
+
 class Agent:
     def __init__(self, model, num_actions, name='global', lr=2.5e-4, gamma=0.99):
         self.num_actions = num_actions
         self.gamma = gamma
         self.t = 0
+        self.name = name
 
         act, train, update_local, action_dist, state_value = build_graph.build_train(
             model=model,
             num_actions=num_actions,
-            optimizer=tf.train.RMSPropOptimizer(learning_rate=2.5e-4, decay=.99),
+            optimizer=tf.train.RMSPropOptimizer(learning_rate=1e-4, decay=.99, epsilon=0.1),
             scope=name
         )
 
@@ -32,54 +34,45 @@ class Agent:
         self.actions = []
         self.values = []
 
-    def discount(self, rewards, gamma, bootstrap_value):
-        returns = [bootstrap_value]
-        length = len(rewards)
-        for i in reversed(range(length)):
-            value = rewards[i] + gamma * returns[length - 1 - i]
-            returns.append(value)
-        return np.array(list(reversed(returns)), dtype=np.float32).flatten()
-
-    def train(self, bootstrap_value):
+    def train(self, bootstrap_value, summary_writer):
         states = np.array(self.states, dtype=np.float32) / 255.0
-        actions = np.array(self.actions)
-        rewards = np.array(self.rewards)
-        values = np.array(self.values, dtype=np.float32).flatten()
+        actions = np.array(self.actions, dtype=np.uint8)
+        returns = []
+        R = bootstrap_value
+        for r in reversed(self.rewards):
+            R = r + 0.99 * R
+            returns.append(R)
+        returns = np.array(list(reversed(returns)), dtype=np.float32)
+        values = np.array(self.values, dtype=np.float32)
 
-        target_values = self.discount(rewards, self.gamma, bootstrap_value)[:len(rewards)]
-        advantages = target_values - values
+        advantages = returns - values
 
-        target_values -= np.mean(target_values)
-        target_values /= np.std(target_values) + 1e-8
-
-        advantages -= np.mean(advantages)
-        advantages /= np.std(advantages) + 1e-8
-
-        loss = self._train(states, None, actions, target_values, advantages)
+        summary, loss = self._train(states, None, actions, returns, advantages)
+        summary_writer.add_summary(summary, loss)
+        self._update_local()
         return loss
 
     def act(self, obs):
-        normalized_obs = np.zeros((1, 1, 84, 84), dtype=np.float32)
+        normalized_obs = np.zeros((1, 84, 84, 1), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
         prob, rnn_state = self._act(normalized_obs, self.rnn_state)
         action = np.argmax(prob)
         self.rnn_state = rnn_state
         return action
 
-    def act_and_train(self, obs, reward):
-        normalized_obs = np.zeros((1, 1, 84, 84), dtype=np.float32)
+    def act_and_train(self, obs, reward, summary_writer):
+        normalized_obs = np.zeros((1, 84, 84, 1), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
         prob, rnn_state = self._act(normalized_obs, self.rnn_state)
         action = np.random.choice(range(self.num_actions), p=prob[0])
-        value = self._state_value(normalized_obs, self.rnn_state)[0]
+        value = self._state_value(normalized_obs, self.rnn_state)[0][0]
 
         if len(self.states) == 5:
-            self.train(0)
+            self.train(self.last_value, summary_writer)
             self.states = []
             self.rewards = []
             self.actions = []
             self.values = []
-            self._update_local()
 
         if self.last_obs is not None:
             self.states.append(self.last_obs)
@@ -88,19 +81,19 @@ class Agent:
             self.values.append(self.last_value)
 
         self.t += 1
-        self.rnn_state = np.array(rnn_state, dtype=np.float32)
+        self.rnn_state = rnn_state
         self.last_obs = obs
         self.last_reward = reward
         self.last_action = action
         self.last_value = value
         return action
 
-    def stop_episode_and_train(self, obs, reward, done=False):
+    def stop_episode_and_train(self, obs, reward, summary_writer, done=False):
         self.states.append(self.last_obs)
         self.rewards.append(reward)
         self.actions.append(self.last_action)
         self.values.append(self.last_value)
-        self.train(0)
+        self.train(0, summary_writer)
         self.stop_episode()
 
     def stop_episode(self):
