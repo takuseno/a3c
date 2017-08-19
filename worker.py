@@ -26,7 +26,7 @@ class Worker:
             local_step = 0
 
             while True:
-                states = np.zeros((1, 84, 84), dtype=np.float32)
+                states = np.zeros((4, 84, 84), dtype=np.float32)
                 reward = 0
                 done = False
                 clipped_reward = 0
@@ -41,11 +41,11 @@ class Worker:
                     states[0] = state
 
                     if done:
-                        self.agent.stop_episode_and_train(states.reshape(84, 84, 1), clipped_reward, summary_writer, done=done)
+                        self.agent.stop_episode_and_train(np.transpose(states, [1, 2, 0]), clipped_reward, summary_writer, done=done)
                         break
 
                     if self.training:
-                        action_index = self.agent.act_and_train(states.reshape((84, 84, 1)), clipped_reward, summary_writer)
+                        action_index = self.agent.act_and_train(np.transpose(states, [1, 2, 0]), clipped_reward, summary_writer)
                     else:
                         action_index = self.agent.act(states)
                     action = self.actions[action_index]

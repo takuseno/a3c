@@ -13,7 +13,7 @@ class Agent:
         act, train, update_local, action_dist, state_value = build_graph.build_train(
             model=model,
             num_actions=num_actions,
-            optimizer=tf.train.RMSPropOptimizer(learning_rate=1e-4, decay=.99, epsilon=0.1),
+            optimizer=tf.train.RMSPropOptimizer(learning_rate=7e-4, decay=.99, epsilon=0.1),
             scope=name
         )
 
@@ -23,7 +23,9 @@ class Agent:
         self._action_dist = action_dist
         self._state_value = state_value
 
-        self.rnn_state = None
+        self.initial_state = np.zeros((1, 256), np.float32)
+        self.rnn_state0 = self.initial_state
+        self.rnn_state1 = self.initial_state
         self.last_obs = None
         self.last_reward = None
         self.last_action = None
@@ -47,13 +49,14 @@ class Agent:
 
         advantages = returns - values
 
-        summary, loss = self._train(states, None, actions, returns, advantages)
+        summary, loss = self._train(states, self.initial_state,
+                self.initial_state, actions, returns, advantages)
         summary_writer.add_summary(summary, loss)
         self._update_local()
         return loss
 
     def act(self, obs):
-        normalized_obs = np.zeros((1, 84, 84, 1), dtype=np.float32)
+        normalized_obs = np.zeros((1, 84, 84, 4), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
         prob, rnn_state = self._act(normalized_obs, self.rnn_state)
         action = np.argmax(prob)
@@ -61,11 +64,11 @@ class Agent:
         return action
 
     def act_and_train(self, obs, reward, summary_writer):
-        normalized_obs = np.zeros((1, 84, 84, 1), dtype=np.float32)
+        normalized_obs = np.zeros((1, 84, 84, 4), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
-        prob, rnn_state = self._act(normalized_obs, self.rnn_state)
+        prob, rnn_state = self._act(normalized_obs, self.rnn_state0, self.rnn_state1)
         action = np.random.choice(range(self.num_actions), p=prob[0])
-        value = self._state_value(normalized_obs, self.rnn_state)[0][0]
+        value = self._state_value(normalized_obs, self.rnn_state0, self.rnn_state1)[0][0]
 
         if len(self.states) == 5:
             self.train(self.last_value, summary_writer)
@@ -81,7 +84,7 @@ class Agent:
             self.values.append(self.last_value)
 
         self.t += 1
-        self.rnn_state = rnn_state
+        self.rnn_state0, self.rnn_state1 = rnn_state
         self.last_obs = obs
         self.last_reward = reward
         self.last_action = action
@@ -97,7 +100,8 @@ class Agent:
         self.stop_episode()
 
     def stop_episode(self):
-        self.rnn_state = None
+        self.rnn_state0 = self.initial_state
+        self.rnn_state1 = self.initial_state
         self.last_obs = None
         self.last_reward = None
         self.last_action = None
