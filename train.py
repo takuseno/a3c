@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--env', type=str, default='PongDeterministic-v4')
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--threads', type=int, default=8)
+    parser.add_argument('--load', type=str)
     args = parser.parse_args()
 
     sess = tf.Session()
@@ -33,6 +34,11 @@ def main():
     master = Agent(model, len(actions), name='global')
 
     global_step = tf.Variable(0, dtype=tf.int64, name='global_step')
+
+    global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
+    saver = tf.train.Saver(global_vars)
+    if args.load:
+        saver.restore(sess, args.load)
 
     workers = []
     for i in range(args.threads):
@@ -52,7 +58,7 @@ def main():
     coord = tf.train.Coordinator()
     threads = []
     for i in range(len(workers)):
-        worker_thread = lambda: workers[i].run(sess, summary_writer)
+        worker_thread = lambda: workers[i].run(sess, summary_writer, saver)
         thread = threading.Thread(target=worker_thread)
         thread.start()
         threads.append(thread)

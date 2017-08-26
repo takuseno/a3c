@@ -21,7 +21,7 @@ class Worker:
         self.global_step = global_step
         self.inc_global_step = global_step.assign_add(1)
 
-    def run(self, sess, summary_writer):
+    def run(self, sess, summary_writer, saver):
         with sess.as_default():
             local_step = 0
 
@@ -63,7 +63,9 @@ class Worker:
                     sum_of_rewards += reward
                     step += 1
                     local_step += 1 
-                    get_session().run(self.inc_global_step)
+                    global_step = get_session().run(self.inc_global_step)
+                    if global_step % 1000000 == 0:
+                        saver.save(sess, 'models/model', global_step=global_step)
 
                 print('worker: {}, global: {}, local: {}, reward: {}'.format(
                         self.name, self.global_step.value().eval(), local_step, sum_of_rewards))
