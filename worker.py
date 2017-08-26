@@ -41,13 +41,17 @@ class Worker:
                     states[0] = state
 
                     if done:
-                        self.agent.stop_episode_and_train(np.transpose(states, [1, 2, 0]), clipped_reward, summary_writer, done=done)
+                        if self.training:
+                            self.agent.stop_episode_and_train(
+                                    np.transpose(states, [1, 2, 0]), clipped_reward, summary_writer, done=done)
+                        else:
+                            self.agent.stop_episode()
                         break
 
                     if self.training:
                         action_index = self.agent.act_and_train(np.transpose(states, [1, 2, 0]), clipped_reward, summary_writer)
                     else:
-                        action_index = self.agent.act(states)
+                        action_index = self.agent.act(np.transpose(states, [1, 2, 0]))
                     action = self.actions[action_index]
 
                     state, reward, done, info = self.env.step(action)
@@ -64,7 +68,7 @@ class Worker:
                     step += 1
                     local_step += 1 
                     global_step = get_session().run(self.inc_global_step)
-                    if global_step % 1000000 == 0:
+                    if self.training and global_step % 1000000 == 0:
                         saver.save(sess, 'models/model', global_step=global_step)
 
                 print('worker: {}, global: {}, local: {}, reward: {}'.format(

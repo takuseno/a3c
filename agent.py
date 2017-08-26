@@ -58,9 +58,9 @@ class Agent:
     def act(self, obs):
         normalized_obs = np.zeros((1, 84, 84, 4), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
-        prob, rnn_state = self._act(normalized_obs, self.rnn_state)
-        action = np.argmax(prob)
-        self.rnn_state = rnn_state
+        prob, rnn_state = self._act(normalized_obs, self.rnn_state0, self.rnn_state1)
+        action = np.random.choice(range(self.num_actions), p=prob[0])
+        self.rnn_state0, self.rnn_state1 = rnn_state
         return action
 
     def act_and_train(self, obs, reward, summary_writer):
