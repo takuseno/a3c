@@ -51,7 +51,7 @@ class Agent:
 
         summary, loss = self._train(states, self.initial_state,
                 self.initial_state, actions, returns, advantages)
-        summary_writer.add_summary(summary, loss)
+        summary_writer.add_summary(summary, self.t)
         self._update_local()
         return loss
 

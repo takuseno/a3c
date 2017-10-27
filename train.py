@@ -14,6 +14,7 @@ from actions import get_action_space
 from network import make_network
 from agent import Agent
 from worker import Worker
+from reward_summary import RewardSummary
 
 def main():
     parser = argparse.ArgumentParser()
@@ -34,6 +35,8 @@ def main():
     master = Agent(model, len(actions), name='global')
 
     global_step = tf.Variable(0, dtype=tf.int64, name='global_step')
+
+    reward_summary = RewardSummary()
 
     global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
     saver = tf.train.Saver(global_vars)
@@ -58,14 +61,14 @@ def main():
     coord = tf.train.Coordinator()
     threads = []
     for i in range(len(workers)):
-        worker_thread = lambda: workers[i].run(sess, summary_writer, saver)
+        worker_thread = lambda: workers[i].run(sess, summary_writer, saver, reward_summary)
         thread = threading.Thread(target=worker_thread)
         thread.start()
         threads.append(thread)
         time.sleep(0.1)
 
     if args.render:
-        sample_worker.run(sess, summary_writer)
+        sample_worker.run(sess, summary_writer, saver, reward_summary)
 
     coord.join(threads)
 
