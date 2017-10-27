@@ -3,7 +3,9 @@ import tensorflow as tf
 import lightsaber.tensorflow.util as util
 
 
-def build_train(model, num_actions, optimizer, scope='a3c', reuse=None):
+def build_train(model, num_actions, scope='a3c', reuse=None):
+
+
     with tf.variable_scope(scope, reuse=reuse):
         obs_input = tf.placeholder(tf.float32, [None, 84, 84, 4], name='obs')
         rnn_state_ph0 = tf.placeholder(tf.float32, [1, 256])
@@ -13,6 +15,7 @@ def build_train(model, num_actions, optimizer, scope='a3c', reuse=None):
         target_values_ph = tf.placeholder(tf.float32, [None], name='value')
         advantages_ph = tf.placeholder(tf.float32, [None], name='advantage')
         rnn_state_tuple = tf.contrib.rnn.LSTMStateTuple(rnn_state_ph0, rnn_state_ph1)
+        lr_ph = tf.placeholder(tf.float32, [], name='learning_rate')
 
         policy, value, state_out = model(obs_input, rnn_state_tuple, num_actions, scope='model')
 
@@ -31,6 +34,8 @@ def build_train(model, num_actions, optimizer, scope='a3c', reuse=None):
         gradients, _ = tf.clip_by_global_norm(tf.gradients(loss, local_vars), 40.0)
 
         global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
+
+        optimizer = tf.train.RMSPropOptimizer(learning_rate=lr_ph, decay=.99, epsilon=0.1)
         optimize_expr = optimizer.apply_gradients(zip(gradients, global_vars))
 
         update_local_expr = []
@@ -42,7 +47,7 @@ def build_train(model, num_actions, optimizer, scope='a3c', reuse=None):
         train = util.function(
             inputs=[
                 obs_input, rnn_state_ph0, rnn_state_ph1,
-                        actions_ph, target_values_ph, advantages_ph
+                actions_ph, target_values_ph, advantages_ph, lr_ph
             ],
             outputs=[loss_summary, loss],
             updates=[optimize_expr]

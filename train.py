@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--env', type=str, default='PongDeterministic-v4')
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--threads', type=int, default=8)
+    parser.add_argument('--final-step', type=int, default=10 ** 7)
     parser.add_argument('--load', type=str)
     args = parser.parse_args()
 
@@ -32,7 +33,7 @@ def main():
 
     env_name = args.env
     actions = get_action_space(env_name)
-    master = Agent(model, len(actions), name='global')
+    master = Agent(model, len(actions), final_step=args.final_step, name='global')
 
     global_step = tf.Variable(0, dtype=tf.int64, name='global_step')
 
@@ -48,7 +49,8 @@ def main():
         render = False
         if args.render and i == 0:
             render = True
-        worker = Worker('worker{}'.format(i), model, global_step, env_name, render=render)
+        worker = Worker('worker{}'.format(i), model,
+                global_step, env_name, args.final_step, render=render)
         workers.append(worker)
 
     summary_writer = tf.summary.FileWriter('log', sess.graph)

@@ -4,16 +4,16 @@ import tensorflow as tf
 
 
 class Agent:
-    def __init__(self, model, num_actions, name='global', lr=2.5e-4, gamma=0.99):
+    def __init__(self, model, num_actions, final_step=10 ** 7, gamma=0.99, name='global'):
         self.num_actions = num_actions
         self.gamma = gamma
+        self.final_step = final_step
         self.t = 0
         self.name = name
 
         act, train, update_local, action_dist, state_value = build_graph.build_train(
             model=model,
             num_actions=num_actions,
-            optimizer=tf.train.RMSPropOptimizer(learning_rate=7e-4, decay=.99, epsilon=0.1),
             scope=name
         )
 
@@ -36,21 +36,26 @@ class Agent:
         self.actions = []
         self.values = []
 
-    def train(self, bootstrap_value, summary_writer):
+    def train(self, bootstrap_value, summary_writer, global_step):
         states = np.array(self.states, dtype=np.float32) / 255.0
         actions = np.array(self.actions, dtype=np.uint8)
         returns = []
         R = bootstrap_value
         for r in reversed(self.rewards):
-            R = r + 0.99 * R
+            R = r + self.gamma * R
             returns.append(R)
         returns = np.array(list(reversed(returns)), dtype=np.float32)
         values = np.array(self.values, dtype=np.float32)
 
         advantages = returns - values
 
+        factor = 1.0 - float(global_step) / self.final_step
+        if factor < 0:
+            factor = 0
+        lr = 7e-4 * factor
+
         summary, loss = self._train(states, self.initial_state,
-                self.initial_state, actions, returns, advantages)
+                self.initial_state, actions, returns, advantages, lr)
         summary_writer.add_summary(summary, self.t)
         self._update_local()
         return loss
@@ -63,7 +68,7 @@ class Agent:
         self.rnn_state0, self.rnn_state1 = rnn_state
         return action
 
-    def act_and_train(self, obs, reward, summary_writer):
+    def act_and_train(self, obs, reward, summary_writer, global_step):
         normalized_obs = np.zeros((1, 84, 84, 4), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
         prob, rnn_state = self._act(normalized_obs, self.rnn_state0, self.rnn_state1)
@@ -71,7 +76,7 @@ class Agent:
         value = self._state_value(normalized_obs, self.rnn_state0, self.rnn_state1)[0][0]
 
         if len(self.states) == 5:
-            self.train(self.last_value, summary_writer)
+            self.train(self.last_value, summary_writer, global_step)
             self.states = []
             self.rewards = []
             self.actions = []
@@ -91,12 +96,12 @@ class Agent:
         self.last_value = value
         return action
 
-    def stop_episode_and_train(self, obs, reward, summary_writer, done=False):
+    def stop_episode_and_train(self, obs, reward, summary_writer, global_step, done=False):
         self.states.append(self.last_obs)
         self.rewards.append(reward)
         self.actions.append(self.last_action)
         self.values.append(self.last_value)
-        self.train(0, summary_writer)
+        self.train(0, summary_writer, global_step)
         self.stop_episode()
 
     def stop_episode(self):

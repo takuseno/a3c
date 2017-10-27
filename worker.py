@@ -11,19 +11,20 @@ from network import make_network
 from agent import Agent
 
 class Worker:
-    def __init__(self, name, model, global_step, env_name, render=False, training=True):
+    def __init__(self, name, model, global_step, env_name, final_step, render=False, training=True):
         self.training = training
         self.actions = get_action_space(env_name)
         self.env = gym.make(env_name)
         self.name = name
         self.render = render
-        self.agent = Agent(model, len(self.actions), name=name)
+        self.agent = Agent(model, len(self.actions), final_step=final_step, name=name)
         self.global_step = global_step
         self.inc_global_step = global_step.assign_add(1)
 
     def run(self, sess, summary_writer, saver, reward_summary):
         with sess.as_default():
             local_step = 0
+            global_step = 0
 
             while True:
                 states = np.zeros((4, 84, 84), dtype=np.float32)
@@ -43,15 +44,17 @@ class Worker:
                     if done:
                         if self.training:
                             self.agent.stop_episode_and_train(
-                                    np.transpose(states, [1, 2, 0]), clipped_reward, summary_writer, done=done)
+                                    np.transpose(states, [1, 2, 0]), clipped_reward, summary_writer, global_step, done=done)
                         else:
                             self.agent.stop_episode()
                         break
 
+                    transposed_states = np.transpose(states, [1, 2, 0])
                     if self.training:
-                        action_index = self.agent.act_and_train(np.transpose(states, [1, 2, 0]), clipped_reward, summary_writer)
+                        action_index = self.agent.act_and_train(
+                                transposed_states, clipped_reward, summary_writer, global_step)
                     else:
-                        action_index = self.agent.act(np.transpose(states, [1, 2, 0]))
+                        action_index = self.agent.act(transposed_states)
                     action = self.actions[action_index]
 
                     state, reward, done, info = self.env.step(action)
