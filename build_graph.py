@@ -37,7 +37,7 @@ def build_train(model, num_actions, scope='a3c', reuse=None):
 
         # loss
         value_loss = tf.nn.l2_loss(target_values_ph - tf.reshape(value, [-1]))
-        entropy = -tf.reduce_sum(policy * log_policy)
+        entropy = -tf.reduce_sum(policy * log_policy, reduction_indices=1)
         policy_loss = -tf.reduce_sum(log_prob * advantages_ph + entropy * 0.01)
         loss = 0.5 * value_loss + policy_loss
         loss_summary = tf.summary.scalar('{}_loss'.format(scope), loss)
