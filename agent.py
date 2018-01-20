@@ -4,24 +4,23 @@ import tensorflow as tf
 
 
 class Agent:
-    def __init__(self, model, num_actions, final_step=10 ** 7, gamma=0.99, name='global'):
+    def __init__(self, model, num_actions,
+            final_step=10 ** 7, gamma=0.99, name='global'):
         self.num_actions = num_actions
         self.gamma = gamma
         self.final_step = final_step
         self.t = 0
         self.name = name
 
-        act, train, update_local, action_dist, state_value = build_graph.build_train(
+        self._act,\
+        self._train,\
+        self._update_local,\
+        self._action_dist,\
+        self._state_value = build_graph.build_train(
             model=model,
             num_actions=num_actions,
             scope=name
         )
-
-        self._act = act
-        self._train = train
-        self._update_local = update_local
-        self._action_dist = action_dist
-        self._state_value = state_value
 
         self.initial_state = np.zeros((1, 256), np.float32)
         self.rnn_state0 = self.initial_state
@@ -63,7 +62,11 @@ class Agent:
     def act(self, obs):
         normalized_obs = np.zeros((1, 84, 84, 4), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
-        prob, rnn_state = self._act(normalized_obs, self.rnn_state0, self.rnn_state1)
+        prob, rnn_state = self._act(
+            normalized_obs,
+            self.rnn_state0,
+            self.rnn_state1
+        )
         action = np.random.choice(range(self.num_actions), p=prob[0])
         self.rnn_state0, self.rnn_state1 = rnn_state
         return action
@@ -71,9 +74,17 @@ class Agent:
     def act_and_train(self, obs, reward, summary_writer, global_step):
         normalized_obs = np.zeros((1, 84, 84, 4), dtype=np.float32)
         normalized_obs[0] = np.array(obs, dtype=np.float32) / 255.0
-        prob, rnn_state = self._act(normalized_obs, self.rnn_state0, self.rnn_state1)
+        prob, rnn_state = self._act(
+            normalized_obs,
+            self.rnn_state0,
+            self.rnn_state1
+        )
         action = np.random.choice(range(self.num_actions), p=prob[0])
-        value = self._state_value(normalized_obs, self.rnn_state0, self.rnn_state1)[0][0]
+        value = self._state_value(
+            normalized_obs,
+            self.rnn_state0,
+            self.rnn_state1
+        )[0][0]
 
         if len(self.states) == 5:
             self.train(self.last_value, summary_writer, global_step)
@@ -96,7 +107,8 @@ class Agent:
         self.last_value = value
         return action
 
-    def stop_episode_and_train(self, obs, reward, summary_writer, global_step, done=False):
+    def stop_episode_and_train(self, obs, reward,
+            summary_writer, global_step, done=False):
         self.states.append(self.last_obs)
         self.rewards.append(reward)
         self.actions.append(self.last_action)

@@ -15,6 +15,7 @@ from network import make_network
 from agent import Agent
 from worker import Worker
 from reward_summary import RewardSummary
+from datetime import datetime
 
 def main():
     parser = argparse.ArgumentParser()
@@ -23,6 +24,7 @@ def main():
     parser.add_argument('--threads', type=int, default=8)
     parser.add_argument('--final-step', type=int, default=10 ** 7)
     parser.add_argument('--load', type=str)
+    parser.add_argument('--log', type=str, default=datetime.now().strftime('%Y%m%d%H%M%S'))
     args = parser.parse_args()
 
     sess = tf.Session()
@@ -53,7 +55,8 @@ def main():
                 global_step, env_name, args.final_step, render=render)
         workers.append(worker)
 
-    summary_writer = tf.summary.FileWriter('log', sess.graph)
+    logdir = os.path.join(os.path.dirname(__file__), 'logs/{}'.format(args.log))
+    summary_writer = tf.summary.FileWriter(logdir, sess.graph)
 
     if args.render:
         sample_worker = workers.pop(0)
