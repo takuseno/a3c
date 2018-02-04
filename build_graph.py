@@ -6,7 +6,7 @@ import lightsaber.tensorflow.util as util
 def build_train(model, num_actions, scope='a3c', reuse=None):
     with tf.variable_scope(scope, reuse=reuse):
         # placeholers
-        obs_input = tf.placeholder(tf.float32, [None, 84, 84, 4], name='obs')
+        obs_input = tf.placeholder(tf.float32, [None, 84, 84, 1], name='obs')
         rnn_state_ph0 = tf.placeholder(tf.float32, [1, 256], name='rnn_state_0')
         rnn_state_ph1 = tf.placeholder(tf.float32, [1, 256], name='rnn_state_1')
         actions_ph = tf.placeholder(tf.uint8, [None], name='action')
@@ -38,9 +38,9 @@ def build_train(model, num_actions, scope='a3c', reuse=None):
         # loss
         value_loss = tf.nn.l2_loss(target_values_ph - tf.reshape(value, [-1]))
         entropy = -tf.reduce_sum(policy * log_policy, reduction_indices=1)
-        policy_loss = -tf.reduce_sum(log_prob * advantages_ph + entropy * 0.01)
+        advantages  = tf.reshape(advantages_ph, [-1, 1])
+        policy_loss = -tf.reduce_sum(log_prob * advantages + entropy * 0.01)
         loss = 0.5 * value_loss + policy_loss
-        loss_summary = tf.summary.scalar('{}_loss'.format(scope), loss)
 
         # local network weights
         local_vars = tf.get_collection(
@@ -59,13 +59,7 @@ def build_train(model, num_actions, scope='a3c', reuse=None):
             40.0
         )
 
-        # optimizer
-        optimizer = tf.train.RMSPropOptimizer(
-            learning_rate=lr_ph,
-            decay=0.99,
-            epsilon=0.1,
-            momentum=0
-        )
+        optimizer = tf.train.AdamOptimizer(1e-4)
         optimize_expr = optimizer.apply_gradients(zip(gradients, global_vars))
 
         update_local_expr = []
@@ -79,7 +73,7 @@ def build_train(model, num_actions, scope='a3c', reuse=None):
                 obs_input, rnn_state_ph0, rnn_state_ph1,
                 actions_ph, target_values_ph, advantages_ph, lr_ph
             ],
-            outputs=[loss_summary, loss],
+            outputs=[loss],
             updates=[optimize_expr]
         )
 
@@ -88,14 +82,9 @@ def build_train(model, num_actions, scope='a3c', reuse=None):
             policy
         )
 
-        state_value = util.function(
-            [obs_input, rnn_state_ph0, rnn_state_ph1],
-            value
-        )
-
         act = util.function(
             inputs=[obs_input, rnn_state_ph0, rnn_state_ph1],
-            outputs=[policy, state_out]
+            outputs=[policy, value, state_out]
         )
 
-    return act, train, update_local, action_dist, state_value
+    return act, train, update_local, action_dist

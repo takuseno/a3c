@@ -26,12 +26,13 @@ def _make_network(convs, inpt, rnn_state_tuple, num_actions, scope, reuse=None):
         conv_out = layers.fully_connected(
             layers.flatten(out),
             256,
+            weights_initializer=normalized_columns_initializer(0.01),
             activation_fn=tf.nn.relu
         )
 
         with tf.variable_scope('rnn'):
             lstm_cell = tf.contrib.rnn.BasicLSTMCell(256, state_is_tuple=True)
-            rnn_in = tf.expand_dims(conv_out, [0])
+            rnn_in = tf.reshape(conv_out, [1, -1, 256])
             step_size = tf.shape(inpt)[:1]
             lstm_outputs, lstm_state = tf.nn.dynamic_rnn(
                 lstm_cell,
@@ -44,8 +45,9 @@ def _make_network(convs, inpt, rnn_state_tuple, num_actions, scope, reuse=None):
 
         policy = layers.fully_connected(
             rnn_out,
-            num_actions, activation_fn=tf.nn.softmax,
-            weights_initializer=normalized_columns_initializer(),
+            num_actions,
+            activation_fn=tf.nn.softmax,
+            weights_initializer=normalized_columns_initializer(0.01),
             biases_initializer=None
         )
 

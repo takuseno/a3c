@@ -10,11 +10,11 @@ import numpy as np
 import tensorflow as tf
 
 from lightsaber.tensorflow.util import initialize
+from lightsaber.tensorflow.log import TfBoardLogger
 from actions import get_action_space
 from network import make_network
 from agent import Agent
 from worker import Worker
-from reward_summary import RewardSummary
 from datetime import datetime
 
 def main():
@@ -39,8 +39,6 @@ def main():
 
     global_step = tf.Variable(0, dtype=tf.int64, name='global_step')
 
-    reward_summary = RewardSummary()
-
     global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
     saver = tf.train.Saver(global_vars)
     if args.load:
@@ -58,6 +56,9 @@ def main():
     logdir = os.path.join(os.path.dirname(__file__), 'logs/{}'.format(args.log))
     summary_writer = tf.summary.FileWriter(logdir, sess.graph)
 
+    logger = TfBoardLogger(summary_writer)
+    logger.register('reward', dtype=tf.int8)
+
     if args.render:
         sample_worker = workers.pop(0)
 
@@ -66,14 +67,14 @@ def main():
     coord = tf.train.Coordinator()
     threads = []
     for i in range(len(workers)):
-        worker_thread = lambda: workers[i].run(sess, summary_writer, saver, reward_summary)
+        worker_thread = lambda: workers[i].run(sess, saver, logger)
         thread = threading.Thread(target=worker_thread)
         thread.start()
         threads.append(thread)
         time.sleep(0.1)
 
     if args.render:
-        sample_worker.run(sess, summary_writer, saver, reward_summary)
+        sample_worker.run(sess, saver, logger)
 
     coord.join(threads)
 
