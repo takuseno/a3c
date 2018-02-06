@@ -12,7 +12,6 @@ def build_train(model, num_actions, scope='a3c', reuse=None):
         actions_ph = tf.placeholder(tf.uint8, [None], name='action')
         target_values_ph = tf.placeholder(tf.float32, [None], name='value')
         advantages_ph = tf.placeholder(tf.float32, [None], name='advantage')
-        lr_ph = tf.placeholder(tf.float32, [], name='learning_rate')
 
         # rnn state in tuple
         rnn_state_tuple = tf.contrib.rnn.LSTMStateTuple(
@@ -71,7 +70,7 @@ def build_train(model, num_actions, scope='a3c', reuse=None):
         train = util.function(
             inputs=[
                 obs_input, rnn_state_ph0, rnn_state_ph1,
-                actions_ph, target_values_ph, advantages_ph, lr_ph
+                actions_ph, target_values_ph, advantages_ph
             ],
             outputs=[loss],
             updates=[optimize_expr]
