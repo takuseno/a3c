@@ -34,7 +34,6 @@ class Agent(AgentInterface):
         states = np.array(self.rollout.states, dtype=np.float32)
         actions = np.array(self.rollout.actions, dtype=np.uint8)
         v, adv = self.rollout.compute_v_and_adv(bootstrap_value, self.gamma)
-
         loss = self._train(
             states,
             self.rollout.features[0][0],
@@ -49,8 +48,6 @@ class Agent(AgentInterface):
     def act(self, obs, reward, training=True):
         # change state shape to WHC
         obs = np.transpose(obs, [1, 2, 0])
-        # clip reward
-        reward = np.clip(reward, -1.0, 1.0)
         # take next action
         prob, value, rnn_state = self._act(
             obs.reshape(1, 84, 84, 1),
@@ -83,7 +80,6 @@ class Agent(AgentInterface):
 
     def stop_episode(self, obs, reward, done=False, training=True):
         if training:
-            reward = np.clip(reward, -1.0, 1.0)
             self.rollout.add(
                 state=self.last_obs,
                 action=self.last_action,
