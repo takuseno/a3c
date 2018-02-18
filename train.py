@@ -12,6 +12,7 @@ import tensorflow as tf
 from lightsaber.tensorflow.util import initialize
 from lightsaber.tensorflow.log import TfBoardLogger
 from lightsaber.rl.trainer import AsyncTrainer
+from lightsaber.rl.env_wrapper import EnvWrapper
 from actions import get_action_space
 from network import make_network
 from agent import Agent
@@ -50,12 +51,22 @@ def main():
     if args.load:
         saver.restore(sess, args.load)
 
+    def s_preprocess(state):
+        state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
+        state = cv2.resize(state, (84, 84))
+        state = np.array(state, dtype=np.float32)
+        return state / 255.0
+
     agents = []
     envs = []
     for i in range(args.threads):
         agent = Agent(model, actions, name='worker{}'.format(i))
         agents.append(agent)
-        env = gym.make(args.env)
+        env = EnvWrapper(
+            gym.make(args.env),
+            r_preprocess=lambda r: np.clip(r, -1, 1),
+            s_preprocess=s_preprocess
+        )
         envs.append(env)
 
     initialize()
@@ -64,12 +75,6 @@ def main():
     logger = TfBoardLogger(summary_writer)
     logger.register('reward', dtype=tf.int8)
     end_episode = lambda r, gs, s, ge, e: logger.plot('reward', r, gs)
-
-    def preprocess(state):
-        state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
-        state = cv2.resize(state, (84, 84))
-        state = np.array(state, dtype=np.float32)
-        return state / 255.0
 
     def after_action(state, reward, shared_step, global_step, local_step):
         if shared_step % 10 ** 6 == 0:
@@ -83,7 +88,6 @@ def main():
         state_shape=[84, 84],
         state_window=1,
         final_step=args.final_step,
-        preprocess=preprocess,
         after_action=after_action,
         end_episode=end_episode,
         training=not args.demo,
