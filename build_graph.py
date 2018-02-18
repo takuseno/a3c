@@ -29,17 +29,16 @@ def build_train(model, num_actions, scope='a3c', reuse=None):
 
         actions_one_hot = tf.one_hot(actions_ph, num_actions, dtype=tf.float32)
         log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
-        log_prob = tf.reduce_sum(
-            tf.multiply(log_policy, actions_one_hot),
-            reduction_indices=1
-        )
+        log_prob = tf.reduce_sum(log_policy * actions_one_hot, [1])
 
         # loss
-        value_loss = tf.nn.l2_loss(target_values_ph - tf.reshape(value, [-1]))
-        entropy = -tf.reduce_sum(policy * log_policy, reduction_indices=1)
+        value_loss = tf.reduce_sum(
+            tf.square(target_values_ph - tf.reshape(value, [-1]))
+        )
+        entropy = -tf.reduce_sum(policy * log_policy)
         advantages  = tf.reshape(advantages_ph, [-1, 1])
-        policy_loss = -tf.reduce_sum(log_prob * advantages + entropy * 0.01)
-        loss = 0.5 * value_loss + policy_loss
+        policy_loss = -tf.reduce_sum(log_prob * advantages)
+        loss = 0.5 * value_loss + policy_loss - entropy * 0.01
 
         # local network weights
         local_vars = tf.get_collection(
