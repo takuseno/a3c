@@ -33,7 +33,9 @@ class Agent(AgentInterface):
     def train(self, bootstrap_value):
         states = np.array(self.rollout.states, dtype=np.float32)
         actions = np.array(self.rollout.actions, dtype=np.uint8)
-        v, adv = self.rollout.compute_v_and_adv(bootstrap_value, self.gamma)
+        rewards = self.rollout.rewards
+        values = self.rollout.values
+        v, adv = compute_v_and_adv(rewards, values, bootstrap_value, self.gamma)
         loss = self._train(
             states,
             self.rollout.features[0][0],
