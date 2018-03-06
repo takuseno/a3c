@@ -9,7 +9,13 @@ def normalized_columns_initializer(std=1.0):
         return tf.constant(out)
     return _initializer
 
-def _make_network(convs, inpt, rnn_state_tuple, num_actions, scope, reuse=None):
+def _make_network(convs,
+                  inpt,
+                  rnn_state_tuple,
+                  num_actions,
+                  lstm_unit,
+                  scope,
+                  reuse=None):
     with tf.variable_scope(scope, reuse=reuse):
         out = inpt
         with tf.variable_scope('convnet'):
@@ -24,40 +30,25 @@ def _make_network(convs, inpt, rnn_state_tuple, num_actions, scope, reuse=None):
                 )
 
         conv_out = layers.fully_connected(
-            layers.flatten(out),
-            256,
-            weights_initializer=normalized_columns_initializer(0.01),
-            activation_fn=tf.nn.relu
-        )
+            layers.flatten(out), lstm_unit, activation_fn=tf.nn.relu)
 
         with tf.variable_scope('rnn'):
-            lstm_cell = tf.contrib.rnn.BasicLSTMCell(256, state_is_tuple=True)
-            rnn_in = tf.reshape(conv_out, [1, -1, 256])
+            lstm_cell = tf.contrib.rnn.BasicLSTMCell(lstm_unit, state_is_tuple=True)
+            rnn_in = tf.reshape(conv_out, [1, -1, lstm_unit])
             step_size = tf.shape(inpt)[:1]
             lstm_outputs, lstm_state = tf.nn.dynamic_rnn(
-                lstm_cell,
-                rnn_in,
-                initial_state=rnn_state_tuple,
-                sequence_length=step_size,
-                time_major=False
-            )
-            rnn_out = tf.reshape(lstm_outputs, [-1, 256])
+                lstm_cell, rnn_in, initial_state=rnn_state_tuple,
+                sequence_length=step_size, time_major=False)
+            rnn_out = tf.reshape(lstm_outputs, [-1, lstm_unit])
 
         policy = layers.fully_connected(
-            rnn_out,
-            num_actions,
-            activation_fn=tf.nn.softmax,
+            rnn_out, num_actions, activation_fn=tf.nn.softmax,
             weights_initializer=normalized_columns_initializer(0.01),
-            biases_initializer=None
-        )
+            biases_initializer=None)
 
         value = layers.fully_connected(
-            rnn_out,
-            1,
-            activation_fn=None,
-            weights_initializer=normalized_columns_initializer(),
-            biases_initializer=None
-        )
+            rnn_out, 1, activation_fn=None, biases_initializer=None,
+            weights_initializer=normalized_columns_initializer())
 
     return policy, value, lstm_state
 

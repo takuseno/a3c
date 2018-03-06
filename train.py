@@ -6,11 +6,12 @@ import gym
 import copy
 import os
 import time
+import constants
 import numpy as np
 import tensorflow as tf
 
 from lightsaber.tensorflow.util import initialize
-from lightsaber.tensorflow.log import TfBoardLogger
+from lightsaber.tensorflow.log import TfBoardLogger, dump_constants
 from lightsaber.rl.trainer import AsyncTrainer
 from lightsaber.rl.env_wrapper import EnvWrapper
 from actions import get_action_space
@@ -18,33 +19,49 @@ from network import make_network
 from agent import Agent
 from datetime import datetime
 
+def make_agent(model, actions, name):
+    return Agent(
+        model,
+        actions,
+        gamma=constants.GAMMA,
+        lstm_unit=constants.LSTM_UNIT,
+        time_horizon=constants.TIME_HORIZON,
+        policy_factor=constants.POLICY_FACTOR,
+        value_factor=constants.VALUE_FACTOR,
+        entropy_factor=constants.ENTROPY_FACTOR,
+        lr=constants.LR,
+        grad_clip=constants.GRAD_CLIP,
+        state_shape=constants.IMAGE_SHAPE + [constants.STATE_WINDOW],
+        name=name
+    )
+
 def main():
     date = datetime.now().strftime('%Y%m%d%H%M%S')
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='PongDeterministic-v4')
     parser.add_argument('--threads', type=int, default=8)
-    parser.add_argument('--final-step', type=int, default=10 ** 7)
     parser.add_argument('--load', type=str)
     parser.add_argument('--logdir', type=str, default=date)
-    parser.add_argument('--outdir', type=str, default=date)
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--demo', action='store_true')
     args = parser.parse_args()
 
-    outdir = os.path.join(os.path.dirname(__file__), args.outdir)
+    outdir = os.path.join(os.path.dirname(__file__), 'results/' + args.logdir)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     logdir = os.path.join(os.path.dirname(__file__), 'logs/' + args.logdir)
 
+    # save settings
+    dump_constants(constants, os.path.join(outdir, 'constants.json'))
+
     sess = tf.Session()
     sess.__enter__()
 
-    model = make_network(
-        [[16, 8, 4, 0], [32, 4, 2, 0]])
+    model = make_network(constants.CONVS)
 
     env_name = args.env
     actions = get_action_space(env_name)
-    master = Agent(model, actions, name='global')
+    master = make_agent(model, actions, 'global')
 
     global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
     saver = tf.train.Saver(global_vars)
@@ -53,14 +70,14 @@ def main():
 
     def s_preprocess(state):
         state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
-        state = cv2.resize(state, (84, 84))
+        state = cv2.resize(state, tuple(constants.IMAGE_SHAPE))
         state = np.array(state, dtype=np.float32)
         return state / 255.0
 
     agents = []
     envs = []
     for i in range(args.threads):
-        agent = Agent(model, actions, name='worker{}'.format(i))
+        agent = make_agent(model, actions, 'worker{}'.format(i))
         agents.append(agent)
         env = EnvWrapper(
             gym.make(args.env),
@@ -85,9 +102,9 @@ def main():
         envs=envs,
         agents=agents,
         render=args.render,
-        state_shape=[84, 84],
-        state_window=1,
-        final_step=args.final_step,
+        state_shape=constants.IMAGE_SHAPE,
+        state_window=constants.STATE_WINDOW,
+        final_step=constants.FINAL_STEP,
         after_action=after_action,
         end_episode=end_episode,
         training=not args.demo,
