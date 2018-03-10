@@ -10,6 +10,7 @@ def normalized_columns_initializer(std=1.0):
     return _initializer
 
 def _make_network(convs,
+                  lstm,
                   inpt,
                   rnn_state_tuple,
                   num_actions,
@@ -41,16 +42,21 @@ def _make_network(convs,
                 sequence_length=step_size, time_major=False)
             rnn_out = tf.reshape(lstm_outputs, [-1, lstm_unit])
 
+        if lstm:
+            out = rnn_out
+        else:
+            out = conv_out
+
         policy = layers.fully_connected(
-            rnn_out, num_actions, activation_fn=tf.nn.softmax,
+            out, num_actions, activation_fn=tf.nn.softmax,
             weights_initializer=normalized_columns_initializer(0.01),
             biases_initializer=None)
 
         value = layers.fully_connected(
-            rnn_out, 1, activation_fn=None, biases_initializer=None,
+            out, 1, activation_fn=None, biases_initializer=None,
             weights_initializer=normalized_columns_initializer())
 
     return policy, value, lstm_state
 
-def make_network(convs):
-    return lambda *args, **kwargs: _make_network(convs, *args, **kwargs)
+def make_network(convs, lstm=True):
+    return lambda *args, **kwargs: _make_network(convs, lstm, *args, **kwargs)

@@ -57,7 +57,7 @@ def main():
     sess = tf.Session()
     sess.__enter__()
 
-    model = make_network(constants.CONVS)
+    model = make_network(constants.CONVS, lstm=constants.LSTM)
 
     env_name = args.env
     actions = get_action_space(env_name)
