@@ -56,7 +56,7 @@ def _make_network(convs,
             out, 1, activation_fn=None, biases_initializer=None,
             weights_initializer=normalized_columns_initializer())
 
-    return policy, value, lstm_state
+    return policy, value, (lstm_state[0][:1, :], lstm_state[1][:1, :])
 
 def make_network(convs, lstm=True):
     return lambda *args, **kwargs: _make_network(convs, lstm, *args, **kwargs)
