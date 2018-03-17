@@ -5,13 +5,13 @@ import lightsaber.tensorflow.util as util
 
 def build_train(model,
                 num_actions,
+                optimizer,
                 lstm_unit=256,
                 state_shape=[84, 84, 1],
                 grad_clip=40.0,
                 value_factor=0.5,
                 policy_factor=1.0,
                 entropy_factor=0.01,
-                lr=1e-4,
                 scope='a3c',
                 reuse=None):
     with tf.variable_scope(scope, reuse=reuse):
@@ -58,7 +58,6 @@ def build_train(model,
         gradients, _ = tf.clip_by_global_norm(
             tf.gradients(loss, local_vars), grad_clip)
 
-        optimizer = tf.train.AdamOptimizer(lr)
         optimize_expr = optimizer.apply_gradients(zip(gradients, global_vars))
 
         update_local_expr = []

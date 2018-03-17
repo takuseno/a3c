@@ -9,13 +9,13 @@ class Agent(AgentInterface):
     def __init__(self,
                  model,
                  actions,
+                 optimizer,
                  gamma=0.99,
                  lstm_unit=256,
                  time_horizon=5,
                  policy_factor=1.0,
                  value_factor=0.5,
                  entropy_factor=0.01,
-                 lr=1e-4,
                  grad_clip=40.0,
                  state_shape=[84, 84, 1],
                  name='global'):
@@ -31,13 +31,13 @@ class Agent(AgentInterface):
         self._action_dist = build_graph.build_train(
             model=model,
             num_actions=len(actions),
+            optimizer=optimizer,
             lstm_unit=lstm_unit,
             state_shape=state_shape,
             grad_clip=grad_clip,
             policy_factor=policy_factor,
             value_factor=value_factor,
             entropy_factor=entropy_factor,
-            lr=lr,
             scope=name
         )
 

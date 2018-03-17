@@ -19,17 +19,17 @@ from network import make_network
 from agent import Agent
 from datetime import datetime
 
-def make_agent(model, actions, name):
+def make_agent(model, actions, optimizer, name):
     return Agent(
         model,
         actions,
+        optimizer,
         gamma=constants.GAMMA,
         lstm_unit=constants.LSTM_UNIT,
         time_horizon=constants.TIME_HORIZON,
         policy_factor=constants.POLICY_FACTOR,
         value_factor=constants.VALUE_FACTOR,
         entropy_factor=constants.ENTROPY_FACTOR,
-        lr=constants.LR,
         grad_clip=constants.GRAD_CLIP,
         state_shape=constants.IMAGE_SHAPE + [constants.STATE_WINDOW],
         name=name
@@ -59,9 +59,12 @@ def main():
 
     model = make_network(constants.CONVS, lstm=constants.LSTM)
 
+    # share Adam optimizer with all threads!
+    optimizer = tf.train.AdamOptimizer(constants.LR)
+
     env_name = args.env
     actions = get_action_space(env_name)
-    master = make_agent(model, actions, 'global')
+    master = make_agent(model, actions, optimizer, 'global')
 
     global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
     saver = tf.train.Saver(global_vars)
@@ -77,7 +80,7 @@ def main():
     agents = []
     envs = []
     for i in range(args.threads):
-        agent = make_agent(model, actions, 'worker{}'.format(i))
+        agent = make_agent(model, actions, optimizer, 'worker{}'.format(i))
         agents.append(agent)
         env = EnvWrapper(
             gym.make(args.env),
