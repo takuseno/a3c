@@ -98,8 +98,8 @@ def main():
 
     def after_action(state, reward, shared_step, global_step, local_step):
         if shared_step % 10 ** 6 == 0:
-            path = os.path.join(outdir, 'model.ckpt', global_step=shared_step)
-            saver.save(sess, path)
+            path = os.path.join(outdir, 'model.ckpt')
+            saver.save(sess, path, global_step=shared_step)
 
     trainer = AsyncTrainer(
         envs=envs,
