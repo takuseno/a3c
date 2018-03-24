@@ -93,7 +93,7 @@ class Agent(AgentInterface):
         self.last_value = value[0][0]
         return self.actions[action]
 
-    def stop_episode(self, obs, reward, done=False, training=True):
+    def stop_episode(self, obs, reward, training=True):
         if training:
             self.rollout.add(
                 state=self.last_obs,
