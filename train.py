@@ -60,7 +60,10 @@ def main():
     model = make_network(constants.CONVS, lstm=constants.LSTM)
 
     # share Adam optimizer with all threads!
-    optimizer = tf.train.AdamOptimizer(constants.LR)
+    lr = tf.Variable(constants.LR)
+    decayed_lr = tf.placeholder(tf.float32)
+    decay_lr_op = lr.assign(decayed_lr)
+    optimizer = tf.train.AdamOptimizer(lr)
 
     env_name = args.env
     actions = get_action_space(env_name)
@@ -97,6 +100,9 @@ def main():
     end_episode = lambda r, gs, s, ge, e: logger.plot('reward', r, gs)
 
     def after_action(state, reward, shared_step, global_step, local_step):
+        if constants.LR_DECAY == 'linear':
+            decay = 1.0 - (float(shared_step) / constants.FINAL_STEP)
+            sess.run(decay_lr_op, feed_dict={decayed_lr: constants.LR * decay})
         if shared_step % 10 ** 6 == 0:
             path = os.path.join(outdir, 'model.ckpt')
             saver.save(sess, path, global_step=shared_step)
