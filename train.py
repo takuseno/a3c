@@ -63,7 +63,7 @@ def main():
     lr = tf.Variable(constants.LR)
     decayed_lr = tf.placeholder(tf.float32)
     decay_lr_op = lr.assign(decayed_lr)
-    optimizer = tf.train.AdamOptimizer(lr)
+    optimizer = tf.train.RMSPropOptimizer(lr)
 
     env_name = args.env
     actions = get_action_space(env_name)
