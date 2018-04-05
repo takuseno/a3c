@@ -96,7 +96,7 @@ def main():
 
     summary_writer = tf.summary.FileWriter(logdir, sess.graph)
     logger = TfBoardLogger(summary_writer)
-    logger.register('reward', dtype=tf.int8)
+    logger.register('reward', dtype=tf.float32)
     end_episode = lambda r, gs, s, ge, e: logger.plot('reward', r, gs)
 
     def after_action(state, reward, shared_step, global_step, local_step):
