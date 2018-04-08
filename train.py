@@ -6,7 +6,8 @@ import gym
 import copy
 import os
 import time
-import constants
+import atari_constants
+import box_constants
 import numpy as np
 import tensorflow as tf
 
@@ -19,7 +20,7 @@ from network import make_network
 from agent import Agent
 from datetime import datetime
 
-def make_agent(model, actions, optimizer, name):
+def make_agent(model, actions, optimizer, state_shape, phi, name, constants):
     return Agent(
         model,
         actions,
@@ -31,7 +32,8 @@ def make_agent(model, actions, optimizer, name):
         value_factor=constants.VALUE_FACTOR,
         entropy_factor=constants.ENTROPY_FACTOR,
         grad_clip=constants.GRAD_CLIP,
-        state_shape=constants.IMAGE_SHAPE + [constants.STATE_WINDOW],
+        state_shape=state_shape,
+        phi=phi,
         name=name
     )
 
@@ -51,44 +53,61 @@ def main():
         os.makedirs(outdir)
     logdir = os.path.join(os.path.dirname(__file__), 'logs/' + args.logdir)
 
+    env_name = args.env
+    tmp_env = gym.make(env_name)
+    if len(tmp_env.observation_space.shape) == 1:
+        observation_space = tmp_env.observation_space
+        constants = box_constants
+        actions = range(tmp_env.action_space.n)
+        state_shape = [observation_space.shape[0], constants.STATE_WINDOW]
+        state_preprocess = lambda s: s
+        # (window_size, dim) -> (dim, window_size)
+        phi = lambda s: np.transpose(s, [1, 0])
+    else:
+        constants = atari_constants
+        actions = get_action_space(env_name)
+        state_shape = constants.STATE_SHAPE + [constants.STATE_WINDOW]
+        def state_preprocess(state):
+            state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
+            state = cv2.resize(state, tuple(constants.STATE_SHAPE))
+            state = np.array(state, dtype=np.float32)
+            return state / 255.0
+        # (window_size, H, W) -> (H, W, window_size)
+        phi = lambda s: np.transpose(s, [1, 2, 0])
+
     # save settings
     dump_constants(constants, os.path.join(outdir, 'constants.json'))
 
     sess = tf.Session()
     sess.__enter__()
 
-    model = make_network(constants.CONVS, lstm=constants.LSTM)
+    model = make_network(constants.CONVS, constants.FCS, lstm=constants.LSTM)
 
     # share Adam optimizer with all threads!
     lr = tf.Variable(constants.LR)
     decayed_lr = tf.placeholder(tf.float32)
     decay_lr_op = lr.assign(decayed_lr)
-    optimizer = tf.train.AdamOptimizer(lr)
+    optimizer = tf.train.RMSPropOptimizer(lr, decay=0.99, epsilon=1e-5)
 
-    env_name = args.env
-    actions = get_action_space(env_name)
-    master = make_agent(model, actions, optimizer, 'global')
+    master = make_agent(
+        model, actions, optimizer, state_shape, phi, 'global', constants)
 
     global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
     saver = tf.train.Saver(global_vars)
     if args.load:
         saver.restore(sess, args.load)
 
-    def s_preprocess(state):
-        state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
-        state = cv2.resize(state, tuple(constants.IMAGE_SHAPE))
-        state = np.array(state, dtype=np.float32)
-        return state / 255.0
-
     agents = []
     envs = []
     for i in range(args.threads):
-        agent = make_agent(model, actions, optimizer, 'worker{}'.format(i))
+        name = 'worker{}'.format(i)
+        agent = make_agent(
+            model, actions, optimizer, state_shape, phi, name, constants)
         agents.append(agent)
         env = EnvWrapper(
             gym.make(args.env),
             r_preprocess=lambda r: np.clip(r, -1, 1),
-            s_preprocess=s_preprocess
+            s_preprocess=state_preprocess
         )
         envs.append(env)
 
@@ -102,6 +121,8 @@ def main():
     def after_action(state, reward, shared_step, global_step, local_step):
         if constants.LR_DECAY == 'linear':
             decay = 1.0 - (float(shared_step) / constants.FINAL_STEP)
+            if decay < 0.0:
+                decay = 0.0
             sess.run(decay_lr_op, feed_dict={decayed_lr: constants.LR * decay})
         if shared_step % 10 ** 6 == 0:
             path = os.path.join(outdir, 'model.ckpt')
@@ -111,7 +132,7 @@ def main():
         envs=envs,
         agents=agents,
         render=args.render,
-        state_shape=constants.IMAGE_SHAPE,
+        state_shape=state_shape[:-1],
         state_window=constants.STATE_WINDOW,
         final_step=constants.FINAL_STEP,
         after_action=after_action,

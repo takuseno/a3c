@@ -18,12 +18,14 @@ class Agent(AgentInterface):
                  entropy_factor=0.01,
                  grad_clip=40.0,
                  state_shape=[84, 84, 1],
+                 phi=lambda s: s,
                  name='global'):
         self.actions = actions
         self.gamma = gamma
         self.name = name
         self.time_horizon = time_horizon
         self.state_shape = state_shape
+        self.phi = phi
 
         self._act,\
         self._train,\
@@ -65,7 +67,7 @@ class Agent(AgentInterface):
 
     def act(self, obs, reward, training=True):
         # change state shape to WHC
-        obs = np.transpose(obs, [1, 2, 0])
+        obs = self.phi(obs)
         # take next action
         prob, value, rnn_state = self._act(
             [obs], self.rnn_state0, self.rnn_state1)
