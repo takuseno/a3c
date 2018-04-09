@@ -104,12 +104,14 @@ def main():
         agent = make_agent(
             model, actions, optimizer, state_shape, phi, name, constants)
         agents.append(agent)
-        env = EnvWrapper(
-            gym.make(args.env),
+        env = gym.make(args.env)
+        env.seed(i)
+        wrapped_env = EnvWrapper(
+            env,
             r_preprocess=lambda r: np.clip(r, -1, 1),
             s_preprocess=state_preprocess
         )
-        envs.append(env)
+        envs.append(wrapped_env)
 
     initialize()
 
