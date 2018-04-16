@@ -14,6 +14,7 @@ import tensorflow as tf
 from lightsaber.tensorflow.util import initialize
 from lightsaber.tensorflow.log import TfBoardLogger, dump_constants
 from lightsaber.rl.trainer import AsyncTrainer
+from lightsaber.rl.evaluator import Evaluator, Recorder
 from lightsaber.rl.env_wrapper import EnvWrapper
 from actions import get_action_space
 from network import make_network
@@ -46,6 +47,7 @@ def main():
     parser.add_argument('--logdir', type=str, default=date)
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--demo', action='store_true')
+    parser.add_argument('--record', action='store_true')
     args = parser.parse_args()
 
     outdir = os.path.join(os.path.dirname(__file__), 'results/' + args.logdir)
@@ -116,9 +118,10 @@ def main():
     initialize()
 
     summary_writer = tf.summary.FileWriter(logdir, sess.graph)
-    logger = TfBoardLogger(summary_writer)
-    logger.register('reward', dtype=tf.float32)
-    end_episode = lambda r, gs, s, ge, e: logger.plot('reward', r, gs)
+    tflogger = TfBoardLogger(summary_writer)
+    tflogger.register('reward', dtype=tf.float32)
+    tflogger.register('eval_reward', dtype=tf.float32)
+    end_episode = lambda r, gs, s, ge, e: tflogger.plot('reward', r, gs)
 
     def after_action(state, reward, shared_step, global_step, local_step):
         if constants.LR_DECAY == 'linear':
@@ -130,6 +133,19 @@ def main():
             path = os.path.join(outdir, 'model.ckpt')
             saver.save(sess, path, global_step=shared_step)
 
+    evaluator = Evaluator(
+        env=copy.deepcopy(envs[0]),
+        state_shape=state_shape[:-1],
+        state_window=constants.STATE_WINDOW,
+        eval_episodes=constants.EVAL_EPISODES,
+        recorder=Recorder(outdir) if args.record else None,
+        record_episodes=constants.RECORD_EPISODES
+    )
+    def should_eval(last_step, last_episode, global_step, global_episode, step, episode):
+        duration = global_step - last_step
+        return duration > 0 and duration > constants.EVAL_INTERVAL
+    end_eval = lambda gs, ge, s, e, r: tflogger.plot('eval_reward', np.mean(r), gs)
+
     trainer = AsyncTrainer(
         envs=envs,
         agents=agents,
@@ -140,7 +156,10 @@ def main():
         after_action=after_action,
         end_episode=end_episode,
         training=not args.demo,
-        n_threads=args.threads
+        n_threads=args.threads,
+        evaluator=evaluator,
+        should_eval=should_eval,
+        end_eval=end_eval
     )
     trainer.start()
 
