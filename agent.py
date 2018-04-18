@@ -102,6 +102,7 @@ class Agent(AgentInterface):
                 action=self.last_action,
                 reward=reward,
                 value=self.last_value,
+                feature=[self.rnn_state0, self.rnn_state1],
                 terminal=True
             )
             self.train(0)
