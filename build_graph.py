@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import lightsaber.tensorflow.util as util
 
 
 def build_train(model,
@@ -65,23 +64,34 @@ def build_train(model,
         for local_var, global_var in zip(local_vars, global_vars):
             update_local_expr.append(local_var.assign(global_var))
         update_local_expr = tf.group(*update_local_expr)
-        update_local = util.function([], [], updates=[update_local_expr])
 
-        train = util.function(
-            inputs=[
-                obs_input, rnn_state_ph0, rnn_state_ph1,
-                actions_ph, target_values_ph, advantages_ph
-            ],
-            outputs=[loss],
-            updates=[optimize_expr]
-        )
+        def update_local(sess=None):
+            if sess is None:
+                sess = tf.get_default_session()
+            sess.run(update_local_expr)
 
-        action_dist = util.function(
-            [obs_input, rnn_state_ph0, rnn_state_ph1], policy)
+        def train(obs, rnn_state0, rnn_state1, actions, target_values, advantages, sess=None):
+            if sess is None:
+                sess = tf.get_default_session()
+            feed_dict = {
+                obs_input: obs,
+                rnn_state_ph0: rnn_state0,
+                rnn_state_ph1: rnn_state1,
+                actions_ph: actions,
+                target_values_ph: target_values,
+                advantages_ph: advantages
+            }
+            loss_val, _ = sess.run([loss, optimize_expr], feed_dict=feed_dict)
+            return loss_val
 
-        act = util.function(
-            inputs=[obs_input, rnn_state_ph0, rnn_state_ph1],
-            outputs=[policy, value, state_out]
-        )
+        def act(obs, rnn_state0, rnn_state1, sess=None):
+            if sess is None:
+                sess = tf.get_default_session()
+            feed_dict = {
+                obs_input: obs,
+                rnn_state_ph0: rnn_state0,
+                rnn_state_ph1: rnn_state1
+            }
+            return sess.run([policy, value, state_out], feed_dict=feed_dict)
 
-    return act, train, update_local, action_dist
+    return act, train, update_local
