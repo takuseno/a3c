@@ -57,6 +57,7 @@ def main():
 
     env_name = args.env
     tmp_env = gym.make(env_name)
+    # box environment
     if len(tmp_env.observation_space.shape) == 1:
         observation_space = tmp_env.observation_space
         constants = box_constants
@@ -65,12 +66,17 @@ def main():
         state_preprocess = lambda s: s
         # (window_size, dim) -> (dim, window_size)
         phi = lambda s: np.transpose(s, [1, 0])
+    # atari environment
     else:
         constants = atari_constants
         actions = get_action_space(env_name)
         state_shape = constants.STATE_SHAPE + [constants.STATE_WINDOW]
         def state_preprocess(state):
             state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
+            state = cv2.resize(state, (210, 160))
+            state = cv2.resize(state, (84, 110))
+            # remove score bar, atari specific modification
+            state = state[18:102, :]
             state = cv2.resize(state, tuple(constants.STATE_SHAPE))
             state = np.array(state, dtype=np.float32)
             return state / 255.0
