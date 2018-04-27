@@ -1,5 +1,4 @@
 import threading
-import multiprocessing
 import argparse
 import cv2
 import gym
@@ -11,11 +10,11 @@ import box_constants
 import numpy as np
 import tensorflow as tf
 
-from lightsaber.tensorflow.util import initialize
-from lightsaber.tensorflow.log import TfBoardLogger, dump_constants
-from lightsaber.rl.trainer import AsyncTrainer
-from lightsaber.rl.evaluator import Evaluator, Recorder
-from lightsaber.rl.env_wrapper import EnvWrapper
+from rlsaber.log import TfBoardLogger, dump_constants
+from rlsaber.trainer import AsyncTrainer
+from rlsaber.trainer import Evaluator, Recorder
+from rlsaber.env import EnvWrapper
+from rlsaber.preprocess import atari_preprocess
 from actions import get_action_space
 from network import make_network
 from agent import Agent
@@ -72,12 +71,8 @@ def main():
         actions = get_action_space(env_name)
         state_shape = constants.STATE_SHAPE + [constants.STATE_WINDOW]
         def state_preprocess(state):
-            state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
-            state = cv2.resize(state, (210, 160))
-            state = cv2.resize(state, (84, 110))
-            # remove score bar, atari specific modification
-            state = state[18:102, :]
-            state = cv2.resize(state, tuple(constants.STATE_SHAPE))
+            # atari specific preprocessing
+            state = atari_preprocess(state, constants.STATE_SHAPE)
             state = np.array(state, dtype=np.float32)
             return state / 255.0
         # (window_size, H, W) -> (H, W, window_size)
@@ -121,7 +116,7 @@ def main():
         )
         envs.append(wrapped_env)
 
-    initialize()
+    sess.run(tf.global_variables_initializer())
 
     summary_writer = tf.summary.FileWriter(logdir, sess.graph)
     tflogger = TfBoardLogger(summary_writer)

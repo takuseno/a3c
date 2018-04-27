@@ -1,11 +1,10 @@
-from lightsaber.rl.util import Rollout, compute_v_and_adv
-from lightsaber.rl.trainer import AgentInterface
+from rlsaber.util import Rollout, compute_v_and_adv
 import build_graph
 import numpy as np
 import tensorflow as tf
 
 
-class Agent(AgentInterface):
+class Agent:
     def __init__(self,
                  model,
                  actions,
