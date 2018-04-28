@@ -39,13 +39,14 @@ def build_train(model,
         # loss
         advantages  = tf.reshape(advantages_ph, [-1, 1])
         target_values = tf.reshape(target_values_ph, [-1, 1])
-        value_loss = tf.reduce_sum(
-            (target_values - value) ** 2, name='value_loss')
-        entropy = -tf.reduce_sum(policy * log_policy, name='entropy_penalty')
-        policy_loss = -tf.reduce_sum(log_prob * advantages, name='policy_loss')
+        with tf.variable_scope('value_loss'):
+            value_loss = tf.reduce_sum((target_values - value) ** 2)
+        with tf.variable_scope('entropy_penalty'):
+            entropy = -tf.reduce_sum(policy * log_policy)
+        with tf.variable_scope('policy_loss'):
+            policy_loss = tf.reduce_sum(log_prob * advantages)
         loss = value_factor * value_loss\
-            + policy_factor * policy_loss\
-            - entropy_factor * entropy
+            - policy_factor * policy_loss - entropy_factor * entropy
 
         # local network weights
         local_vars = tf.get_collection(
