@@ -84,7 +84,9 @@ def main():
     sess = tf.Session()
     sess.__enter__()
 
-    model = make_network(constants.CONVS, constants.FCS, lstm=constants.LSTM)
+    model = make_network(
+        constants.CONVS, constants.FCS,
+        lstm=constants.LSTM, padding=constants.PADDING)
 
     # share Adam optimizer with all threads!
     lr = tf.Variable(constants.LR)
