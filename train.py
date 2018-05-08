@@ -92,7 +92,7 @@ def main():
     lr = tf.Variable(constants.LR)
     decayed_lr = tf.placeholder(tf.float32)
     decay_lr_op = lr.assign(decayed_lr)
-    optimizer = tf.train.RMSPropOptimizer(lr, decay=0.99, epsilon=0.1)
+    optimizer = tf.train.AdamOptimizer(lr)
 
     master = make_agent(
         model, actions, optimizer, state_shape, phi, 'global', constants)
