@@ -4,12 +4,14 @@ STATE_WINDOW = 4
 CONVS = [[16, 8, 4], [32, 4, 2]]
 PADDING = 'VALID'
 FCS = [256]
+OPTIMIZER = 'rmsprop'
 # OpenAI syle
 #STATE_SHAPE = [42, 42]
 #STATE_WINDOW = 1
 #CONVS = [[32, 3, 2], [32, 3, 2], [32, 3, 2], [32, 3, 2]]
 #PADDING = 'SAME'
 #FCS = []
+#OPTIMIZER = 'adam'
 
 LSTM_UNIT = 256
 FINAL_STEP = 10 ** 8
