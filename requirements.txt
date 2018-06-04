@@ -1,0 +1,7 @@
+atari-py==0.1.1
+future==0.16.0
+gym==0.10.5
+opencv-python==3.4.1.15
+git+https://github.com/imai-laboratory/rlsaber
+scipy==1.1.0
+tensorflow==1.8.0
