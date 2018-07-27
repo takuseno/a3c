@@ -5,7 +5,7 @@ from datetime import datetime
 from train import train
 
 
-def main():
+def main(_):
     date = datetime.now().strftime('%Y%m%d%H%M%S')
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='PongDeterministic-v4')
@@ -18,10 +18,11 @@ def main():
     parser.add_argument('--num-processes', type=int, default=8)
     args = parser.parse_args()
 
-    cluster = tf.train.ClusterSpec({
-        "worker": ['localhost:{}'.format(2222 + i) for i in range(args.num_processes)],
-        "ps": ["localhost:2221"]
-    })
+    cluster_spec = {
+        "worker": ['127.0.0.1:{}'.format(2222 + i) for i in range(args.num_processes)],
+        "ps": ["127.0.0.1:2221"]
+    }
+    cluster = tf.train.ClusterSpec(cluster_spec).as_cluster_def()
 
     if args.job == 'ps':
         config = tf.ConfigProto(device_filters=["/job:ps"])
@@ -36,4 +37,4 @@ def main():
         train(server, cluster, args)
 
 if __name__ == '__main__':
-    main()
+    tf.app.run(main=main)

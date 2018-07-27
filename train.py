@@ -75,30 +75,35 @@ def train(server, cluster, args):
         constants.CONVS, constants.FCS,
         lstm=constants.LSTM, padding=constants.PADDING)
 
+    if args.index == 0:
+        tf.reset_default_graph()
+
     # share Adam optimizer with all threads!
     worker_device = '/job:worker/task:{}/cpu:0'.format(args.index)
-    with tf.device(tf.train.replica_device_setter(worker_device=worker_device, cluster=cluster)):
-        lr = tf.Variable(constants.LR)
+    shared_device = tf.train.replica_device_setter(
+        1, worker_device=worker_device, cluster=cluster)
+    with tf.device(shared_device):
+        lr = tf.Variable(constants.LR, trainable=False)
         decayed_lr = tf.placeholder(tf.float32)
         decay_lr_op = lr.assign(decayed_lr)
         if constants.OPTIMIZER == 'rmsprop':
             optimizer = tf.train.RMSPropOptimizer(lr, decay=0.99, epsilon=0.1)
         else:
             optimizer = tf.train.AdamOptimizer(lr)
-        global_step = tf.Variable(0)
+        global_step = tf.Variable(0, trainable=False)
         add_global_step_op = global_step.assign(tf.add(global_step, 1))
-
         master = make_agent(
             model, actions, optimizer, state_shape, phi, 'global', constants)
 
     with tf.device(worker_device):
         agent = make_agent(
             model, actions, optimizer, state_shape, phi, 'worker', constants)
-        local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'worker')
+        local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'worker{}'.format(args.index))
         init_op = tf.variables_initializer(local_vars)
 
-    #global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
-    #saver = tf.train.Saver(global_vars)
+    global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
+    saver = tf.train.Saver(global_vars)
+
     #if args.load:
     #    saver.restore(sess, args.load)
 
@@ -113,25 +118,25 @@ def train(server, cluster, args):
         s_preprocess=state_preprocess
     )
 
-    global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
-
     sv = tf.train.Supervisor(is_chief=(args.index == 0),
-                             init_op=init_op,
-                             init_fn=lambda s: s.run(tf.global_variables_initializer()),
+                             logdir=logdir,
+                             init_op=tf.global_variables_initializer(),
                              global_step=global_step,
-                             ready_op=tf.report_uninitialized_variables(global_vars))
+                             recovery_wait_secs=1,
+                             saver=saver)
 
     config = tf.ConfigProto(device_filters=["/job:ps", worker_device])
 
-    with sv.managed_session(server.target, config=config) as sess, sess.as_default():
-        print('start{}'.format(args.index))
-        agent.set_session(sess)
+    with sv.prepare_or_wait_for_session(server.target, config=config) as sess, sess.as_default():
+    #with sv.managed_session(server.target, config=config) as sess, sess.as_default():
+    #with tf.Session(server.target, config=config) as sess, sess.as_default():
+        #summary_writer = tf.summary.FileWriter(logdir, sess.graph)
+        #tflogger = TfBoardLogger(summary_writer)
+        #tflogger.register('reward', dtype=tf.float32)
+        #tflogger.register('eval_reward', dtype=tf.float32)
+        #end_episode = lambda r, gs, s, ge, e: tflogger.plot('reward', r, gs)
 
-    #summary_writer = tf.summary.FileWriter(logdir, sess.graph)
-    #tflogger = TfBoardLogger(summary_writer)
-    #tflogger.register('reward', dtype=tf.float32)
-    #tflogger.register('eval_reward', dtype=tf.float32)
-    #end_episode = lambda r, gs, s, ge, e: tflogger.plot('reward', r, gs)
+        print(args.index)
 
         def after_action(state, reward, step, local_step):
             #if constants.LR_DECAY == 'linear':
@@ -139,8 +144,8 @@ def train(server, cluster, args):
             #    if decay < 0.0:
             #        decay = 0.0
             #    sess.run(decay_lr_op, feed_dict={decayed_lr: constants.LR * decay})
-            sess.run(add_global_step_op)
-            print(sess.run(global_step))
+            step = sess.run(add_global_step_op)
+            print(args.index, step)
             #if shared_step % 10 ** 6 == 0:
             #    path = os.path.join(outdir, 'model.ckpt')
             #    saver.save(sess, path, global_step=shared_step)
