@@ -20,11 +20,19 @@ from network import make_network
 from agent import Agent
 from datetime import datetime
 
-def make_agent(model, actions, optimizer, state_shape, phi, name, constants):
+def make_agent(model,
+               actions,
+               optimizer,
+               global_step,
+               state_shape,
+               phi,
+               name,
+               constants):
     return Agent(
         model,
         actions,
         optimizer,
+        global_step,
         gamma=constants.GAMMA,
         lstm_unit=constants.LSTM_UNIT,
         time_horizon=constants.TIME_HORIZON,
@@ -38,8 +46,10 @@ def make_agent(model, actions, optimizer, state_shape, phi, name, constants):
     )
 
 def train(server, cluster, args):
+    is_chief = args.index == 0
+
     outdir = os.path.join(os.path.dirname(__file__), 'results/' + args.logdir)
-    if not os.path.exists(outdir):
+    if is_chief and not os.path.exists(outdir):
         os.makedirs(outdir)
     logdir = os.path.join(os.path.dirname(__file__), 'logs/' + args.logdir)
 
@@ -69,39 +79,38 @@ def train(server, cluster, args):
         phi = lambda s: np.transpose(s, [1, 2, 0])
 
     # save settings
-    dump_constants(constants, os.path.join(outdir, 'constants.json'))
+    if is_chief:
+        dump_constants(constants, os.path.join(outdir, 'constants.json'))
 
     model = make_network(
         constants.CONVS, constants.FCS,
         lstm=constants.LSTM, padding=constants.PADDING)
-
-    if args.index == 0:
-        tf.reset_default_graph()
 
     # share Adam optimizer with all threads!
     worker_device = '/job:worker/task:{}/cpu:0'.format(args.index)
     shared_device = tf.train.replica_device_setter(
         1, worker_device=worker_device, cluster=cluster)
     with tf.device(shared_device):
-        lr = tf.Variable(constants.LR, trainable=False)
+        lr = tf.Variable(constants.LR)
         decayed_lr = tf.placeholder(tf.float32)
         decay_lr_op = lr.assign(decayed_lr)
         if constants.OPTIMIZER == 'rmsprop':
             optimizer = tf.train.RMSPropOptimizer(lr, decay=0.99, epsilon=0.1)
         else:
             optimizer = tf.train.AdamOptimizer(lr)
-        global_step = tf.Variable(0, trainable=False)
+        global_step = tf.Variable(0, dtype=tf.int32, name='step')
         add_global_step_op = global_step.assign(tf.add(global_step, 1))
-        master = make_agent(
-            model, actions, optimizer, state_shape, phi, 'global', constants)
+        master = make_agent(model, actions, optimizer, global_step,
+                            state_shape, phi, 'global', constants)
 
     with tf.device(worker_device):
-        agent = make_agent(
-            model, actions, optimizer, state_shape, phi, 'worker', constants)
-        local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'worker{}'.format(args.index))
-        init_op = tf.variables_initializer(local_vars)
+        agent = make_agent(model, actions, optimizer, global_step,
+                           state_shape, phi, 'worker', constants)
+        local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'worker')
+        local_init_op = tf.variables_initializer(local_vars)
 
-    global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
+    global_vars = [v for v in tf.global_variables() if not v.name.startswith('worker')]
+    init_op = tf.variables_initializer(global_vars)
     saver = tf.train.Saver(global_vars)
 
     #if args.load:
@@ -118,37 +127,39 @@ def train(server, cluster, args):
         s_preprocess=state_preprocess
     )
 
-    sv = tf.train.Supervisor(is_chief=(args.index == 0),
+    summary_writer = tf.summary.FileWriter(logdir)
+    tflogger = TfBoardLogger(summary_writer)
+    tflogger.register('reward', dtype=tf.float32)
+    tflogger.register('eval_reward', dtype=tf.float32)
+
+    sv = tf.train.Supervisor(is_chief=is_chief,
                              logdir=logdir,
-                             init_op=tf.global_variables_initializer(),
+                             init_op=init_op,
+                             local_init_op=local_init_op,
                              global_step=global_step,
                              recovery_wait_secs=1,
+                             summary_writer=summary_writer,
+                             ready_op=tf.report_uninitialized_variables(global_vars),
                              saver=saver)
 
     config = tf.ConfigProto(device_filters=["/job:ps", worker_device])
 
-    with sv.prepare_or_wait_for_session(server.target, config=config) as sess, sess.as_default():
-    #with sv.managed_session(server.target, config=config) as sess, sess.as_default():
-    #with tf.Session(server.target, config=config) as sess, sess.as_default():
-        #summary_writer = tf.summary.FileWriter(logdir, sess.graph)
-        #tflogger = TfBoardLogger(summary_writer)
-        #tflogger.register('reward', dtype=tf.float32)
-        #tflogger.register('eval_reward', dtype=tf.float32)
-        #end_episode = lambda r, gs, s, ge, e: tflogger.plot('reward', r, gs)
-
-        print(args.index)
+    with sv.managed_session(server.target, config=config) as sess, sess.as_default():
+        def end_episode(reward, step, episode):
+            if is_chief:
+                step = sess.run(global_step)
+                tflogger.plot('reward', reward, step)
 
         def after_action(state, reward, step, local_step):
-            #if constants.LR_DECAY == 'linear':
-            #    decay = 1.0 - (float(shared_step) / constants.FINAL_STEP)
-            #    if decay < 0.0:
-            #        decay = 0.0
-            #    sess.run(decay_lr_op, feed_dict={decayed_lr: constants.LR * decay})
-            step = sess.run(add_global_step_op)
-            print(args.index, step)
-            #if shared_step % 10 ** 6 == 0:
-            #    path = os.path.join(outdir, 'model.ckpt')
-            #    saver.save(sess, path, global_step=shared_step)
+            step = sess.run(global_step)
+            if constants.LR_DECAY == 'linear':
+                decay = 1.0 - (float(step) / constants.FINAL_STEP)
+                if decay < 0.0:
+                    decay = 0.0
+                sess.run(decay_lr_op, feed_dict={decayed_lr: constants.LR * decay})
+            #if is_chief and step % 10 ** 6 == 0:
+            #    path = os.path.join(logdir, 'model.ckpt')
+            #    saver.save(sess, path, global_step=step)
 
         trainer = Trainer(
             env=wrapped_env,
@@ -158,7 +169,7 @@ def train(server, cluster, args):
             state_window=constants.STATE_WINDOW,
             final_step=constants.FINAL_STEP,
             after_action=after_action,
-            #end_episode=end_episode,
+            end_episode=end_episode,
             training=not args.demo
         )
         trainer.start()

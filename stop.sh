@@ -1,0 +1,1 @@
+kill -KILL `cat pid`

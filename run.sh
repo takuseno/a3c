@@ -1,10 +1,11 @@
-LOGPATH="`date '+%y%m%d%H%M%S'`"
+echo "$$" > pid
 
 while getopts e:n: OPT
 do
   case $OPT in
     "e" ) GYMENV_FLAG="TRUE" ; GYMENV="$OPTARG" ;;
     "n" ) NUM_FLAG="TRUE" ; NUM=$OPTARG ;;
+    "l" ) LOGPATH_FLAG="TRUE" ; LOGPATH=$OPTARG ;;
   esac
 done
 
@@ -14,6 +15,10 @@ fi
 
 if [ "$NUM_FLAG" != "TRUE" ]; then
   NUM=8
+fi
+
+if [ "$LOGPATH_FLAG" != "TRUE" ]; then
+  LOGPATH="`date '+%y%m%d%H%M%S'`"
 fi
 
 for i in `seq 0 $(($NUM-1))`

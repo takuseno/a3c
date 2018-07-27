@@ -5,6 +5,7 @@ import tensorflow as tf
 def build_train(model,
                 num_actions,
                 optimizer,
+                global_step,
                 lstm_unit=256,
                 state_shape=[84, 84, 1],
                 grad_clip=40.0,
@@ -23,6 +24,9 @@ def build_train(model,
         actions_ph = tf.placeholder(tf.uint8, [None], name='action')
         target_values_ph = tf.placeholder(tf.float32, [None], name='value')
         advantages_ph = tf.placeholder(tf.float32, [None], name='advantage')
+
+        # increment global step
+        inc_step = global_step.assign_add(tf.shape(obs_input)[0])
 
         # rnn state in tuple
         rnn_state_tuple = tf.contrib.rnn.LSTMStateTuple(
@@ -82,7 +86,8 @@ def build_train(model,
                 target_values_ph: target_values,
                 advantages_ph: advantages
             }
-            loss_val, _ = sess.run([loss, optimize_expr], feed_dict=feed_dict)
+            loss_val, _, _ = sess.run(
+                [loss, optimize_expr, inc_step], feed_dict=feed_dict)
             return loss_val
 
         def act(obs, rnn_state0, rnn_state1, sess=None):
