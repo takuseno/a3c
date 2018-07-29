@@ -28,7 +28,7 @@ if [ "$LOGPATH_FLAG" != "TRUE" ]; then
 fi
 ARGS="$ARGS --logdir $LOGPATH"
 
-if [ "$MODELPATH_FLAG" != "TRUE" ]; then
+if [ "$MODELPATH_FLAG" == "TRUE" ]; then
   ARGS="$ARGS --load $MODELPATH"
 fi
 
