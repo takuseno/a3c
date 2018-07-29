@@ -102,6 +102,8 @@ def train(server, cluster, args):
         add_global_step_op = global_step.assign(tf.add(global_step, 1))
         master = make_agent(model, actions, optimizer, global_step,
                             state_shape, phi, 'global', constants)
+        global_vars = tf.global_variables()
+        init_op = tf.variables_initializer(global_vars)
 
     with tf.device(worker_device):
         agent = make_agent(model, actions, optimizer, global_step,
@@ -109,10 +111,7 @@ def train(server, cluster, args):
         local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'worker')
         local_init_op = tf.variables_initializer(local_vars)
 
-    global_vars = [v for v in tf.global_variables() if not v.name.startswith('worker')]
-    init_op = tf.variables_initializer(global_vars)
     saver = tf.train.Saver(global_vars)
-
     #if args.load:
     #    saver.restore(sess, args.load)
 
