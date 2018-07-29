@@ -1,5 +1,7 @@
 # A3C
-A3C imeplementation with TensorFlow.
+A3C imeplementation with Distributed TensorFlow.
+
+Multiple processes instead of multiple threads execute the algorithm as GIL is critical to run many simulators.
 
 ## requirements
 - Python3
@@ -18,7 +20,7 @@ This repostory is inspired by following projects.
 
 ## train
 ```
-$ python train.py [--env environment name] [--threads thread number] [--render] [--demo]
+$ ./run.sh [-e env_id (environment name)] [-n num_of_process (the number of processes)] [-r (render)]
 ```
 
 ### TensorBoard
