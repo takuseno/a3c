@@ -5,7 +5,7 @@ do
   case $OPT in
     "e" ) GYMENV_FLAG="TRUE" ; GYMENV="$OPTARG" ;;
     "n" ) NUM_FLAG="TRUE" ; NUM=$OPTARG ;;
-    "l" ) LOGPATH_FLAG="TRUE" ; LOGPATH=$OPTARG ;;
+    "l" ) LOGPATH_FLAG="TRUE" ; LOGPATH="$OPTARG" ;;
     "r" ) RENDER_FLAG="TRUE" ;;
   esac
 done
