@@ -10,24 +10,30 @@ do
   esac
 done
 
+ARGS=""
+
 if [ "$GYMENV_FLAG" != "TRUE" ]; then
   GYMENV="PongDeterministic-v4"
 fi
+ARGS="$ARGS --env $GYMENV"
 
 if [ "$NUM_FLAG" != "TRUE" ]; then
   NUM=8
 fi
+ARGS="$ARGS --num-processes $NUM"
 
 if [ "$LOGPATH_FLAG" != "TRUE" ]; then
   LOGPATH="`date '+%y%m%d%H%M%S'`"
 fi
+ARGS="$ARGS --logdir $LOGPATH"
 
 for i in `seq 0 $(($NUM-1))`
 do
+  TMPARGS="$ARGS"
   if [ "$RENDER_FLAG" == "TRUE" -a $i == 0 ]; then
-    python main.py --num-processes $NUM --job worker --index $i --logdir $LOGPATH --env $GYMENV --render &
+    TMPARGS="$ARGS --render"
   else
-    python main.py --num-processes $NUM --job worker --index $i --logdir $LOGPATH --env $GYMENV &
+    python main.py --job worker --index $i $TMPARGS &
   fi
 done
-python main.py --num-processes $NUM --job ps --index 0 --logdir $LOGPATH
+python main.py --job ps --index 0 $ARGS
