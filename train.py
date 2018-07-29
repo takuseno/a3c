@@ -48,9 +48,6 @@ def make_agent(model,
 def train(server, cluster, args):
     is_chief = args.index == 0
 
-    outdir = os.path.join(os.path.dirname(__file__), 'results/' + args.logdir)
-    if is_chief and not os.path.exists(outdir):
-        os.makedirs(outdir)
     logdir = os.path.join(os.path.dirname(__file__), 'logs/' + args.logdir)
 
     env_name = args.env
@@ -80,7 +77,7 @@ def train(server, cluster, args):
 
     # save settings
     if is_chief:
-        dump_constants(constants, os.path.join(outdir, 'constants.json'))
+        dump_constants(constants, os.path.join(logdir, 'constants.json'))
 
     model = make_network(
         constants.CONVS, constants.FCS,
