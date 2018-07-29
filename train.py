@@ -111,10 +111,6 @@ def train(server, cluster, args):
         local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'worker')
         local_init_op = tf.variables_initializer(local_vars)
 
-    saver = tf.train.Saver(global_vars)
-    #if args.load:
-    #    saver.restore(sess, args.load)
-
     env = gym.make(args.env)
     env.seed(args.index)
     if is_atari:
@@ -131,12 +127,18 @@ def train(server, cluster, args):
     tflogger.register('reward', dtype=tf.float32)
     tflogger.register('eval_reward', dtype=tf.float32)
 
+    saver = tf.train.Saver(global_vars)
+    def init_fn(sess):
+        if is_chief and args.load is not None:
+            saver.restore(sess, args.load)
+
     sv = tf.train.Supervisor(is_chief=is_chief,
                              logdir=logdir,
                              init_op=init_op,
                              local_init_op=local_init_op,
                              global_step=global_step,
                              recovery_wait_secs=1,
+                             init_fn=init_fn,
                              summary_writer=summary_writer,
                              ready_op=tf.report_uninitialized_variables(global_vars),
                              saver=saver)
@@ -156,9 +158,8 @@ def train(server, cluster, args):
                 if decay < 0.0:
                     decay = 0.0
                 sess.run(decay_lr_op, feed_dict={decayed_lr: constants.LR * decay})
-            #if is_chief and step % 10 ** 6 == 0:
-            #    path = os.path.join(logdir, 'model.ckpt')
-            #    saver.save(sess, path, global_step=step)
+
+        agent.update_local()
 
         trainer = Trainer(
             env=wrapped_env,

@@ -117,3 +117,6 @@ class Agent:
 
     def set_session(self, sess):
         self.sess = sess
+
+    def update_local(self):
+        self._update_local()
