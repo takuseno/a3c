@@ -37,8 +37,7 @@ do
   TMPARGS="$ARGS"
   if [ "$RENDER_FLAG" == "TRUE" -a $i == 0 ]; then
     TMPARGS="$ARGS --render"
-  else
-    python main.py --job worker --index $i $TMPARGS &
   fi
+  python main.py --job worker --index $i $TMPARGS &
 done
 python main.py --job ps --index 0 $ARGS
