@@ -27,6 +27,8 @@ def make_agent(model,
                state_shape,
                phi,
                name,
+               shared_device,
+               worker_device,
                constants):
     return Agent(
         model,
@@ -42,7 +44,9 @@ def make_agent(model,
         grad_clip=constants.GRAD_CLIP,
         state_shape=state_shape,
         phi=phi,
-        name=name
+        name=name,
+        shared_device=shared_device,
+        worker_device=worker_device
     )
 
 def train(server, cluster, args):
@@ -77,6 +81,8 @@ def train(server, cluster, args):
 
     # save settings
     if is_chief:
+        if not os.path.exists(logdir):
+            os.makedirs(logdir)
         dump_constants(constants, os.path.join(logdir, 'constants.json'))
 
     model = make_network(
@@ -97,16 +103,18 @@ def train(server, cluster, args):
             optimizer = tf.train.AdamOptimizer(lr)
         global_step = tf.Variable(0, dtype=tf.int32, name='step')
         add_global_step_op = global_step.assign(tf.add(global_step, 1))
-        master = make_agent(model, actions, optimizer, global_step,
-                            state_shape, phi, 'global', constants)
-        global_vars = tf.global_variables()
-        init_op = tf.variables_initializer(global_vars)
 
-    with tf.device(worker_device):
-        agent = make_agent(model, actions, optimizer, global_step,
-                           state_shape, phi, 'worker', constants)
-        local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'worker')
-        local_init_op = tf.variables_initializer(local_vars)
+    # global parameters
+    master = make_agent(model, actions, optimizer, global_step, state_shape,
+                        phi, 'global', shared_device, shared_device, constants)
+    global_vars = tf.global_variables()
+    init_op = tf.variables_initializer(global_vars)
+
+    # local parameters
+    agent = make_agent(model, actions, optimizer, global_step, state_shape,
+                       phi, 'worker', shared_device, worker_device, constants)
+    local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'worker')
+    local_init_op = tf.variables_initializer(local_vars)
 
     env = gym.make(args.env)
     env.seed(args.index)

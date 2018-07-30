@@ -20,6 +20,8 @@ class Agent:
                  state_shape=[84, 84, 1],
                  phi=lambda s: s,
                  name='global',
+                 shared_device='/cpu:0',
+                 worker_device='/cpu:0',
                  sess=None):
         self.actions = actions
         self.gamma = gamma
@@ -42,7 +44,9 @@ class Agent:
             policy_factor=policy_factor,
             value_factor=value_factor,
             entropy_factor=entropy_factor,
-            scope=name
+            scope=name,
+            shared_device=shared_device,
+            worker_device=worker_device
         )
 
         self.initial_state = np.zeros((1, lstm_unit), np.float32)
