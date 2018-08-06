@@ -66,14 +66,11 @@ def build_train(model,
             update_local_expr.append(local_var.assign(global_var))
         update_local_expr = tf.group(*update_local_expr)
 
-        def update_local(sess=None):
-            if sess is None:
-                sess = tf.get_default_session()
+        def update_local():
+            sess = tf.get_default_session()
             sess.run(update_local_expr)
 
-        def train(obs, rnn_state0, rnn_state1, actions, returns, advantages, sess=None):
-            if sess is None:
-                sess = tf.get_default_session()
+        def train(obs, rnn_state0, rnn_state1, actions, returns, advantages):
             feed_dict = {
                 obs_input: obs,
                 rnn_state_ph0: rnn_state0,
@@ -82,16 +79,16 @@ def build_train(model,
                 returns_ph: returns,
                 advantages_ph: advantages
             }
+            sess = tf.get_default_session()
             return sess.run([loss, optimize_expr], feed_dict=feed_dict)[0]
 
-        def act(obs, rnn_state0, rnn_state1, sess=None):
-            if sess is None:
-                sess = tf.get_default_session()
+        def act(obs, rnn_state0, rnn_state1):
             feed_dict = {
                 obs_input: obs,
                 rnn_state_ph0: rnn_state0,
                 rnn_state_ph1: rnn_state1
             }
+            sess = tf.get_default_session()
             return sess.run([policy, value, state_out], feed_dict=feed_dict)
 
     return act, train, update_local
