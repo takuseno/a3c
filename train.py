@@ -144,19 +144,6 @@ def main():
             path = os.path.join(outdir, 'model.ckpt')
             saver.save(sess, path, global_step=shared_step)
 
-    evaluator = Evaluator(
-        env=copy.deepcopy(envs[0]),
-        state_shape=state_shape[:-1],
-        state_window=constants.STATE_WINDOW,
-        eval_episodes=constants.EVAL_EPISODES,
-        recorder=Recorder(outdir) if args.record else None,
-        record_episodes=constants.RECORD_EPISODES
-    )
-    def should_eval(last_step, last_episode, global_step, global_episode, step, episode):
-        duration = global_step - last_step
-        return duration > 0 and duration > constants.EVAL_INTERVAL
-    end_eval = lambda gs, ge, s, e, r: tflogger.plot('eval_reward', np.mean(r), gs)
-
     trainer = AsyncTrainer(
         envs=envs,
         agents=agents,
@@ -167,10 +154,7 @@ def main():
         after_action=after_action,
         end_episode=end_episode,
         training=not args.demo,
-        n_threads=args.threads,
-        evaluator=evaluator,
-        should_eval=should_eval,
-        end_eval=end_eval
+        n_threads=args.threads
     )
     trainer.start()
 
