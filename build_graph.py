@@ -55,9 +55,11 @@ def build_train(model,
                 update_local_expr.append(local_var.assign(global_var))
             update_local_expr = tf.group(*update_local_expr)
 
-            actions_one_hot = tf.one_hot(actions_ph, num_actions, dtype=tf.float32)
+            actions_one_hot = tf.one_hot(actions_ph, num_actions,
+                                         dtype=tf.float32)
             log_policy = tf.log(tf.clip_by_value(policy, 1e-20, 1.0))
-            log_prob = tf.reduce_sum(log_policy * actions_one_hot, [1])
+            log_prob = tf.reduce_sum(log_policy * actions_one_hot,
+                                     axis=1, keep_dims=True)
 
             # loss
             advantages  = tf.reshape(advantages_ph, [-1, 1])
@@ -73,13 +75,13 @@ def build_train(model,
 
             # gradients
             gradients = tf.gradients(loss, local_vars)
-            gradients, _ = tf.clip_by_global_norm(gradients, grad_clip)
+            clipped_gradients, _ = tf.clip_by_global_norm(gradients, grad_clip)
 
     # share momentum with other workers
     with tf.device(shared_device):
         with tf.variable_scope('global/'):
-            optimize_expr = optimizer.apply_gradients(
-                zip(gradients, global_vars))
+            grads_and_vars = zip(clipped_gradients, global_vars)
+            optimize_expr = optimizer.apply_gradients(grads_and_vars)
 
     def update_local():
         sess = tf.get_default_session()
