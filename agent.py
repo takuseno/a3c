@@ -1,4 +1,4 @@
-from rlsaber.util import Rollout, compute_v_and_adv
+from rlsaber.util import Rollout
 import build_graph
 import numpy as np
 import tensorflow as tf
@@ -58,10 +58,16 @@ class Agent:
         actions = np.array(self.rollout.actions, dtype=np.uint8)
         rewards = self.rollout.rewards
         values = self.rollout.values
-        v, adv = compute_v_and_adv(rewards, values, bootstrap_value, self.gamma)
+        R = bootstrap_value
+        returns = []
+        for reward in reversed(rewards):
+            R = reward + self.gamma * R
+            returns.append(R)
+        returns = np.array(list(reversed(returns)))
+        adv = returns - values
         loss = self._train(
             states, self.rollout.features[0][0], self.rollout.features[0][1],
-            actions, v, adv, self.sess)
+            actions, returns, adv, self.sess)
         self._update_local(self.sess)
         return loss
 
