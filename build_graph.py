@@ -57,9 +57,9 @@ def build_train(model,
 
         # gradients
         gradients = tf.gradients(loss, local_vars)
-        gradients = [tf.clip_by_norm(g, grad_clip) for g in gradients]
-
-        optimize_expr = optimizer.apply_gradients(zip(gradients, global_vars))
+        clipped_gradients, _ = tf.clip_by_global_norm(gradients, grad_clip)
+        grads_and_vars = zip(clipped_gradients, global_vars)
+        optimize_expr = optimizer.apply_gradients(grads_and_vars)
 
         update_local_expr = []
         for local_var, global_var in zip(local_vars, global_vars):
