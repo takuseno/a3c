@@ -62,10 +62,19 @@ class Agent:
         actions = np.array(self.rollout.actions, dtype=np.uint8)
         rewards = self.rollout.rewards
         values = self.rollout.values
-        v, adv = compute_v_and_adv(rewards, values, bootstrap_value, self.gamma)
-        loss = self._train(
-            states, self.rollout.features[0][0], self.rollout.features[0][1],
-            actions, v, adv, self.sess)
+
+        R = bootstrap_value
+        returns = []
+        for reward in reversed(rewards):
+            R = reward + self.gamma * R
+            returns.append(R)
+        returns = np.array(list(reversed(returns)))
+
+        adv = returns - values
+
+        loss = self._train(states, self.rollout.features[0][0],
+                           self.rollout.features[0][1], actions,
+                           returns, adv)
         self._update_local()
         return loss
 
