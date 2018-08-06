@@ -117,7 +117,7 @@ def train(server, cluster, args):
     local_init_op = tf.variables_initializer(local_vars)
 
     env = gym.make(args.env)
-    env.seed(args.index)
+    env.seed(constants.RANDOM_SEED)
     if is_atari:
         env = NoopResetEnv(env, noop_max=7)
         env = EpisodicLifeEnv(env)
