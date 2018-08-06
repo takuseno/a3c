@@ -21,15 +21,13 @@ class Agent:
                  phi=lambda s: s,
                  name='global',
                  shared_device='/cpu:0',
-                 worker_device='/cpu:0',
-                 sess=None):
+                 worker_device='/cpu:0'):
         self.actions = actions
         self.gamma = gamma
         self.name = name
         self.time_horizon = time_horizon
         self.state_shape = state_shape
         self.phi = phi
-        self.sess = sess
 
         self._act,\
         self._train,\
@@ -68,7 +66,7 @@ class Agent:
         loss = self._train(
             states, self.rollout.features[0][0], self.rollout.features[0][1],
             actions, v, adv, self.sess)
-        self._update_local(self.sess)
+        self._update_local()
         return loss
 
     def act(self, obs, reward, training=True):
@@ -76,7 +74,7 @@ class Agent:
         obs = self.phi(obs)
         # take next action
         prob, value, rnn_state = self._act(
-            [obs], self.rnn_state0, self.rnn_state1, self.sess)
+            [obs], self.rnn_state0, self.rnn_state1)
         action = np.random.choice(range(len(self.actions)), p=prob[0])
 
         if training:
@@ -118,9 +116,6 @@ class Agent:
         self.last_obs = None
         self.last_action = None
         self.last_value = None
-
-    def set_session(self, sess):
-        self.sess = sess
 
     def update_local(self):
         self._update_local()

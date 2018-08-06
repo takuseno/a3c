@@ -81,14 +81,11 @@ def build_train(model,
             optimize_expr = optimizer.apply_gradients(
                 zip(gradients, global_vars))
 
-    def update_local(sess=None):
-        if sess is None:
-            sess = tf.get_default_session()
+    def update_local():
+        sess = tf.get_default_session()
         sess.run(update_local_expr)
 
-    def train(obs, rnn_state0, rnn_state1, actions, target_values, advantages, sess=None):
-        if sess is None:
-            sess = tf.get_default_session()
+    def train(obs, rnn_state0, rnn_state1, actions, target_values, advantages):
         feed_dict = {
             obs_input: obs,
             rnn_state_ph0: rnn_state0,
@@ -97,18 +94,16 @@ def build_train(model,
             target_values_ph: target_values,
             advantages_ph: advantages
         }
-        loss_val, _, _ = sess.run(
-            [loss, optimize_expr, inc_step], feed_dict=feed_dict)
-        return loss_val
+        sess = tf.get_default_session()
+        return sess.run([loss, optimize_expr, inc_step], feed_dict=feed_dict)[0]
 
-    def act(obs, rnn_state0, rnn_state1, sess=None):
-        if sess is None:
-            sess = tf.get_default_session()
+    def act(obs, rnn_state0, rnn_state1):
         feed_dict = {
             obs_input: obs,
             rnn_state_ph0: rnn_state0,
             rnn_state_ph1: rnn_state1
         }
+        sess = tf.get_default_session()
         return sess.run([policy, value, state_out], feed_dict=feed_dict)
 
     return act, train, update_local
