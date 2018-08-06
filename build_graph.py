@@ -21,7 +21,7 @@ def build_train(model,
         rnn_state_ph1 = tf.placeholder(
             tf.float32, [1, lstm_unit], name='rnn_state_1')
         actions_ph = tf.placeholder(tf.uint8, [None], name='action')
-        target_values_ph = tf.placeholder(tf.float32, [None], name='value')
+        returns_ph = tf.placeholder(tf.float32, [None], name='return')
         advantages_ph = tf.placeholder(tf.float32, [None], name='advantage')
 
         # rnn state in tuple
@@ -38,9 +38,9 @@ def build_train(model,
 
         # loss
         advantages  = tf.reshape(advantages_ph, [-1, 1])
-        target_values = tf.reshape(target_values_ph, [-1, 1])
+        returns = tf.reshape(returns_ph, [-1, 1])
         with tf.variable_scope('value_loss'):
-            value_loss = tf.reduce_sum((target_values - value) ** 2)
+            value_loss = tf.reduce_sum((returns - value) ** 2)
         with tf.variable_scope('entropy_penalty'):
             entropy = -tf.reduce_sum(policy * log_policy)
         with tf.variable_scope('policy_loss'):
@@ -71,7 +71,7 @@ def build_train(model,
                 sess = tf.get_default_session()
             sess.run(update_local_expr)
 
-        def train(obs, rnn_state0, rnn_state1, actions, target_values, advantages, sess=None):
+        def train(obs, rnn_state0, rnn_state1, actions, returns, advantages, sess=None):
             if sess is None:
                 sess = tf.get_default_session()
             feed_dict = {
@@ -79,11 +79,10 @@ def build_train(model,
                 rnn_state_ph0: rnn_state0,
                 rnn_state_ph1: rnn_state1,
                 actions_ph: actions,
-                target_values_ph: target_values,
+                returns_ph: returns,
                 advantages_ph: advantages
             }
-            loss_val, _ = sess.run([loss, optimize_expr], feed_dict=feed_dict)
-            return loss_val
+            return sess.run([loss, optimize_expr], feed_dict=feed_dict)[0]
 
         def act(obs, rnn_state0, rnn_state1, sess=None):
             if sess is None:
