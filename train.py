@@ -115,7 +115,7 @@ def main():
             model, actions, optimizer, state_shape, phi, name, constants)
         agents.append(agent)
         env = gym.make(args.env)
-        env.seed(i)
+        env.seed(constants.RANDOM_SEED)
         if is_atari:
             env = NoopResetEnv(env)
             env = EpisodicLifeEnv(env)

@@ -13,6 +13,7 @@ OPTIMIZER = 'rmsprop'
 #FCS = []
 #OPTIMIZER = 'adam'
 
+RANDOM_SEED = 1
 LSTM_UNIT = 256
 FINAL_STEP = 10 ** 8
 
