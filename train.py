@@ -10,6 +10,7 @@ import box_constants
 import numpy as np
 import tensorflow as tf
 
+from tqdm import tqdm
 from rlsaber.log import TfBoardLogger, dump_constants
 from rlsaber.trainer import Trainer
 from rlsaber.trainer import Evaluator, Recorder
@@ -151,10 +152,17 @@ def train(server, cluster, args):
     config = tf.ConfigProto(device_filters=["/job:ps", worker_device])
 
     with sv.managed_session(server.target, config=config) as sess, sess.as_default():
+        if is_chief:
+            pbar = tqdm(total=constants.FINAL_STEP, dynamic_ncols=True)
+
         def end_episode(reward, step, episode):
             if is_chief:
                 step = sess.run(global_step)
                 tflogger.plot('reward', reward, step)
+                # hack to set the direct step
+                pbar.n = step
+                pbar.update(0)
+                pbar.set_description('step: {}, reward: {}'.format(step, reward))
 
         def after_action(state, reward, step, local_step):
             step = sess.run(global_step)
@@ -175,6 +183,7 @@ def train(server, cluster, args):
             final_step=constants.FINAL_STEP,
             after_action=after_action,
             end_episode=end_episode,
+            progress_bar=False,
             training=not args.demo
         )
         trainer.start()
