@@ -10,7 +10,6 @@ def build_train(model,
                 state_shape=[84, 84, 1],
                 grad_clip=40.0,
                 value_factor=0.5,
-                policy_factor=1.0,
                 entropy_factor=0.01,
                 scope='a3c',
                 shared_device='/cpu:0',
@@ -71,7 +70,7 @@ def build_train(model,
             with tf.variable_scope('policy_loss'):
                 policy_loss = tf.reduce_sum(log_prob * advantages)
             loss = value_factor * value_loss\
-                - policy_factor * policy_loss - entropy_factor * entropy
+                -  policy_loss - entropy_factor * entropy
 
             # gradients
             gradients = tf.gradients(loss, local_vars)
